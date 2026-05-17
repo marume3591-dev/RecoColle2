@@ -1,0 +1,177 @@
+
+/* Class = "UILabel"; text = "Memo"; ObjectID = "29p-Wk-Hb0"; */
+"29p-Wk-Hb0.text" = "Memo";
+
+/* Class = "UIButton"; normalTitle = "Save"; ObjectID = "3fF-y0-vxD"; */
+"3fF-y0-vxD.normalTitle" = "Save";
+
+/* Class = "UILabel"; text = "Label"; ObjectID = "4Bc-ZR-VA6"; */
+"4Bc-ZR-VA6.text" = "Label";
+
+/* Class = "UIButton"; configuration.title = "Close"; ObjectID = "70C-Vu-Y1i"; */
+"70C-Vu-Y1i.configuration.title" = "Close";
+
+/* Class = "UIButton"; normalTitle = "Button"; ObjectID = "70C-Vu-Y1i"; */
+"70C-Vu-Y1i.normalTitle" = "Button";
+
+/* Class = "UITabBarItem"; title = "home"; ObjectID = "9zJ-g3-ybE"; */
+"9zJ-g3-ybE.title" = "home";
+
+/* Class = "UIButton"; configuration.title = "newly listed"; ObjectID = "B3J-pV-0ug"; */
+"B3J-pV-0ug.configuration.title" = "newly listed";
+
+/* Class = "UIButton"; normalTitle = "Button"; ObjectID = "B3J-pV-0ug"; */
+"B3J-pV-0ug.normalTitle" = "Button";
+
+/* Class = "UISegmentedControl"; EYq-q1-6B8.segmentTitles[0] = "Collection List"; ObjectID = "EYq-q1-6B8"; */
+"EYq-q1-6B8.segmentTitles[0]" = "Collection List";
+
+/* Class = "UISegmentedControl"; EYq-q1-6B8.segmentTitles[1] = "Wants List"; ObjectID = "EYq-q1-6B8"; */
+"EYq-q1-6B8.segmentTitles[1]" = "Wants List";
+
+/* Class = "UILabel"; text = "Label"; ObjectID = "IFg-XS-jye"; */
+"IFg-XS-jye.text" = "Label";
+
+/* Class = "UITabBarItem"; title = "settings"; ObjectID = "Jct-4f-FIm"; */
+"Jct-4f-FIm.title" = "settings";
+
+/* Class = "UISegmentedControl"; KcA-b6-lrU.segmentTitles[0] = "Collection"; ObjectID = "KcA-b6-lrU"; */
+"KcA-b6-lrU.segmentTitles[0]" = "Collection";
+
+/* Class = "UISegmentedControl"; KcA-b6-lrU.segmentTitles[1] = "Wants"; ObjectID = "KcA-b6-lrU"; */
+"KcA-b6-lrU.segmentTitles[1]" = "Wants";
+
+/* Class = "UILabel"; text = "Format"; ObjectID = "MtW-U8-FOL"; */
+"MtW-U8-FOL.text" = "Format";
+
+/* Class = "UILabel"; text = "Label"; ObjectID = "QJv-20-qy2"; */
+"QJv-20-qy2.text" = "Label";
+
+/* Class = "UITabBarItem"; title = "Item"; ObjectID = "SKV-ko-XRD"; */
+"SKV-ko-XRD.title" = "Item";
+
+/* Class = "UILabel"; text = "Release Country"; ObjectID = "TTV-Lq-356"; */
+"TTV-Lq-356.text" = "Release Country";
+
+/* Class = "UIButton"; configuration.title = "Scan Cover Text"; ObjectID = "Thg-rJ-fsG"; */
+"Thg-rJ-fsG.configuration.title" = "Scan Cover Text";
+
+/* Class = "UIButton"; normalTitle = "Button"; ObjectID = "Thg-rJ-fsG"; */
+"Thg-rJ-fsG.normalTitle" = "Button";
+
+/* Class = "UILabel"; text = "Artist Name"; ObjectID = "Tlq-b0-SDl"; */
+"Tlq-b0-SDl.text" = "Artist Name";
+
+/* Class = "UITabBarItem"; title = "Item"; ObjectID = "UJu-z0-kyH"; */
+"UJu-z0-kyH.title" = "Item";
+
+/* Class = "UIButton"; normalTitle = "Add"; ObjectID = "XXp-PI-p6y"; */
+"XXp-PI-p6y.normalTitle" = "Add";
+
+/* Class = "UIButton"; normalTitle = "Image selection"; ObjectID = "Ysz-n8-iDz"; */
+"Ysz-n8-iDz.normalTitle" = "Image selection";
+
+/* Class = "UIButton"; configuration.title = "Scan Cover Text"; ObjectID = "ZMj-tp-XkX"; */
+"ZMj-tp-XkX.configuration.title" = "Scan Cover Text";
+
+/* Class = "UIButton"; normalTitle = "Button"; ObjectID = "ZMj-tp-XkX"; */
+"ZMj-tp-XkX.normalTitle" = "Button";
+
+/* Class = "UILabel"; text = "Label"; ObjectID = "abC-b2-eIf"; */
+"abC-b2-eIf.text" = "Label";
+
+/* Class = "UILabel"; text = "Release Date"; ObjectID = "cdo-qd-aYb"; */
+"cdo-qd-aYb.text" = "Release Date";
+
+/* Class = "UILabel"; text = "Release Country"; ObjectID = "d2g-Bz-CxP"; */
+"d2g-Bz-CxP.text" = "Release Country";
+
+/* Class = "UILabel"; text = "Label"; ObjectID = "e3b-D8-Ykr"; */
+"e3b-D8-Ykr.text" = "Label";
+
+/* Class = "UILabel"; text = "Album Title"; ObjectID = "fbE-Zv-cw1"; */
+"fbE-Zv-cw1.text" = "Album Title";
+
+/* Class = "UILabel"; text = "Artist Name"; ObjectID = "gI3-83-wsD"; */
+"gI3-83-wsD.text" = "Artist Name";
+
+/* Class = "UIButton"; configuration.title = "ALL"; ObjectID = "h7Z-A5-eQY"; */
+"h7Z-A5-eQY.configuration.title" = "ALL";
+
+/* Class = "UIButton"; normalTitle = "Button"; ObjectID = "h7Z-A5-eQY"; */
+"h7Z-A5-eQY.normalTitle" = "Button";
+
+/* Class = "UILabel"; text = "Memo"; ObjectID = "hNg-5e-SHx"; */
+"hNg-5e-SHx.text" = "Memo";
+
+/* Class = "UILabel"; text = "Format"; ObjectID = "i5S-8l-GOq"; */
+"i5S-8l-GOq.text" = "Format";
+
+/* Class = "UILabel"; text = "Label"; ObjectID = "j7k-UL-uAg"; */
+"j7k-UL-uAg.text" = "Label";
+
+/* Class = "UITabBarItem"; title = "Album"; ObjectID = "kcI-rv-SUj"; */
+"kcI-rv-SUj.title" = "Album";
+
+/* Class = "UITabBarItem"; title = "Library"; ObjectID = "lHX-gn-X1x"; */
+"lHX-gn-X1x.title" = "Library";
+
+/* Class = "UILabel"; text = "Label"; ObjectID = "mhq-4j-6Wz"; */
+"mhq-4j-6Wz.text" = "Label";
+
+/* Class = "UILabel"; text = "Album Title"; ObjectID = "mzp-dD-zwR"; */
+"mzp-dD-zwR.text" = "Album Title";
+
+/* Class = "UISegmentedControl"; oDN-y6-GcY.segmentTitles[0] = "Collection"; ObjectID = "oDN-y6-GcY"; */
+"oDN-y6-GcY.segmentTitles[0]" = "Collection";
+
+/* Class = "UISegmentedControl"; oDN-y6-GcY.segmentTitles[1] = "Wants"; ObjectID = "oDN-y6-GcY"; */
+"oDN-y6-GcY.segmentTitles[1]" = "Wants";
+
+/* Class = "UIButton"; configuration.title = "Scan Catalog No."; ObjectID = "p7G-9f-C3V"; */
+"p7G-9f-C3V.configuration.title" = "Scan Catalog No.";
+
+/* Class = "UIButton"; normalTitle = "Button"; ObjectID = "p7G-9f-C3V"; */
+"p7G-9f-C3V.normalTitle" = "Button";
+
+/* Class = "UIButton"; normalTitle = "Image selection"; ObjectID = "pD9-Gj-1QZ"; */
+"pD9-Gj-1QZ.normalTitle" = "Image selection";
+
+/* Class = "UILabel"; text = "Results"; ObjectID = "qve-3y-nNu"; */
+"qve-3y-nNu.text" = "Results";
+
+/* Class = "UILabel"; text = "Label"; ObjectID = "s5V-op-4PD"; */
+"s5V-op-4PD.text" = "Label";
+
+/* Class = "UIButton"; configuration.title = "Scan BarCode"; ObjectID = "sMg-57-Voc"; */
+"sMg-57-Voc.configuration.title" = "Scan BarCode";
+
+/* Class = "UIButton"; normalTitle = "Button"; ObjectID = "sMg-57-Voc"; */
+"sMg-57-Voc.normalTitle" = "Button";
+
+/* Class = "UIButton"; configuration.title = "Scan Catalog No."; ObjectID = "tqP-0w-U1o"; */
+"tqP-0w-U1o.configuration.title" = "Scan Catalog No.";
+
+/* Class = "UIButton"; normalTitle = "Button"; ObjectID = "tqP-0w-U1o"; */
+"tqP-0w-U1o.normalTitle" = "Button";
+
+/* Class = "UIButton"; configuration.title = "OK"; ObjectID = "uVo-D3-A0v"; */
+"uVo-D3-A0v.configuration.title" = "OK";
+
+/* Class = "UIButton"; normalTitle = "Button"; ObjectID = "uVo-D3-A0v"; */
+"uVo-D3-A0v.normalTitle" = "Button";
+
+/* Class = "UIButton"; normalTitle = "Button"; ObjectID = "vGW-gz-tep"; */
+"vGW-gz-tep.normalTitle" = "Button";
+
+/* Class = "UILabel"; text = "Label"; ObjectID = "yn0-nw-atN"; */
+"yn0-nw-atN.text" = "Label";
+
+/* Class = "UILabel"; text = "Release Date"; ObjectID = "ywU-Cr-YEl"; */
+"ywU-Cr-YEl.text" = "Release Date";
+
+/* Class = "UIButton"; configuration.title = "Scan BarCode"; ObjectID = "z0e-4F-hlU"; */
+"z0e-4F-hlU.configuration.title" = "Scan BarCode";
+
+/* Class = "UIButton"; normalTitle = "Button"; ObjectID = "z0e-4F-hlU"; */
+"z0e-4F-hlU.normalTitle" = "Button";
