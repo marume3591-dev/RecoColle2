@@ -218,9 +218,14 @@ class ShareViewController: SLComposeServiceViewController {
                 let year = root.year.map{String($0)} ?? ""
                 let country = root.country ?? ""
                 let imageURL = root.images?.first?.uri150 ?? ""
-                
+                let catno = root.labels?.first?.catno ?? ""
+                let label = root.labels?.first?.name ?? ""
+                let releaseId = String(root.id ?? 0)
+
                 print("Artist:",artist)
                 print("Title:",title)
+                print("CatNo:",catno)
+                print("Label:",label)
                 
                 if artist.isEmpty || title.isEmpty {
                     
@@ -228,17 +233,16 @@ class ShareViewController: SLComposeServiceViewController {
                     self.close()
                     return
                 }
-                let catno = root.labels?.first?.catno ?? ""
-                let releaseId = String(root.id ?? 0)
 
                 self.downloadImage(
-                    artist:artist,
-                    title:title,
-                    format:format,
-                    year:year,
-                    country:country,
-                    imageURL:imageURL,
+                    artist: artist,
+                    title: title,
+                    format: format,
+                    year: year,
+                    country: country,
+                    imageURL: imageURL,
                     catno: catno,
+                    label: label,
                     releaseId: releaseId
                 )
                 
@@ -253,13 +257,14 @@ class ShareViewController: SLComposeServiceViewController {
     
     // MARK: Image
     func downloadImage(
-        artist:String,
-        title:String,
-        format:String,
-        year:String,
-        country:String,
-        imageURL:String,
+        artist: String,
+        title: String,
+        format: String,
+        year: String,
+        country: String,
+        imageURL: String,
         catno: String,
+        label: String,
         releaseId: String
     ){
         
@@ -268,13 +273,14 @@ class ShareViewController: SLComposeServiceViewController {
         guard let url = URL(string:imageURL) else {
             
             save(
-                artist:artist,
-                title:title,
-                format:format,
-                year:year,
-                country:country,
-                image:nil,
-                catno:catno,
+                artist: artist,
+                title: title,
+                format: format,
+                year: year,
+                country: country,
+                image: nil,
+                catno: catno,
+                label: label,
                 releaseId: releaseId
             )
             
@@ -288,24 +294,24 @@ class ShareViewController: SLComposeServiceViewController {
             if let data = data,
                let image = UIImage(data:data){
                 
-                let resized = image.resize3(targetSize:CGSize(width:80,height:80))
+                let resized = image.resize3(targetSize:CGSize(width:400,height:400))
                 imageData = resized.jpegData(compressionQuality:0.1)
             }
             
             self.save(
-                artist:artist,
-                title:title,
-                format:format,
-                year:year,
-                country:country,
-                image:imageData,
-                catno:catno,
+                artist: artist,
+                title: title,
+                format: format,
+                year: year,
+                country: country,
+                image: imageData,
+                catno: catno,
+                label: label,
                 releaseId: releaseId
             )
             
         }.resume()
     }
-    
     
     // MARK: UserAgent
     func userAgent()->String{
@@ -334,6 +340,7 @@ class ShareViewController: SLComposeServiceViewController {
         country: String,
         image: Data?,
         catno: String,
+        label: String,
         releaseId: String
     ) {
         guard let containerURL = FileManager.default
@@ -343,7 +350,6 @@ class ShareViewController: SLComposeServiceViewController {
             return
         }
 
-        // 既存のJSONを読み込む
         let fileURL = containerURL.appendingPathComponent("pending_records.json")
         var records: [[String: Any]] = []
 
@@ -352,7 +358,6 @@ class ShareViewController: SLComposeServiceViewController {
             records = existing
         }
 
-        // 新しいレコードを追加
         var newRecord: [String: Any] = [
             "artistName": artist,
             "albumTitle": title,
@@ -361,7 +366,9 @@ class ShareViewController: SLComposeServiceViewController {
             "releaseCountry": country,
             "wantsFlg": "false",
             "id": UUID().uuidString,
-            "memo": catno.isEmpty ? "" : "CATNO: \(catno)",
+            "memo": "",
+            "catno": catno,
+            "label": label,
             "discogsReleaseId": releaseId
         ]
 
@@ -371,7 +378,6 @@ class ShareViewController: SLComposeServiceViewController {
 
         records.append(newRecord)
 
-        // JSONファイルに書き込む
         do {
             let data = try JSONSerialization.data(withJSONObject: records)
             try data.write(to: fileURL)

@@ -98,7 +98,7 @@
 "collection_value_menu" = "コレクション価値";
 "open_action" = "開く";
 "about_button" = "このアプリについて";
-"about_description" = "アプリの情報";
+"about_description" = "アプリの情報（外部サイトを表示します。広告はサイト運営者のものでアプリ内課金とは関係ありません）";
 "data_section" = "データ";
 "export_data_button" = "データエクスポート";
 "export_data_description" = "コレクションをバックアップ";
@@ -197,3 +197,4 @@
 "close_button" = "閉じる";
 "sns_discography" = "ディスコグラフィー";
 "align_frame_catno" = "レコード番号を枠内に合わせてください";
+"done_button" = "完了";

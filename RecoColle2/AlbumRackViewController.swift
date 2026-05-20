@@ -18,8 +18,9 @@ class AlbumRackViewController: UIViewController,
     
     private var myCollectionView: UICollectionView!
     private var layout: UICollectionViewFlowLayout!
-    private let columns = 3
-    
+    private var columns: Int {
+        UIDevice.current.userInterfaceIdiom == .pad ? 8 : 3
+    }
     private var deleteBarButton: UIBarButtonItem!
     
     // RecordList2キャッシュ
@@ -42,7 +43,24 @@ class AlbumRackViewController: UIViewController,
             myCollectionView.backgroundColor = newValue
         }
     }
-    
+
+    // スクロールトップボタン
+    private let scrollTopButton: UIButton = {
+        let button = UIButton(type: .system)
+        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+        button.setImage(UIImage(systemName: "arrow.up", withConfiguration: config), for: .normal)
+        button.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.85)
+        button.tintColor = .white
+        button.layer.cornerRadius = 22
+        button.layer.shadowColor = UIColor.black.cgColor
+        button.layer.shadowOpacity = 0.25
+        button.layer.shadowOffset = CGSize(width: 0, height: 2)
+        button.layer.shadowRadius = 4
+        button.alpha = 0
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -71,8 +89,14 @@ class AlbumRackViewController: UIViewController,
         navigationItem.rightBarButtonItems = [addButton, deleteBarButton, colorButton]
         
         setupCollectionView()
+        setupScrollTopButton()
         loadData()
         updateActionButtons()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        view.bringSubviewToFront(scrollTopButton)
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -111,6 +135,33 @@ class AlbumRackViewController: UIViewController,
             myCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             myCollectionView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
         ])
+    }
+
+    private func setupScrollTopButton() {
+        view.addSubview(scrollTopButton)
+        view.bringSubviewToFront(scrollTopButton)
+        NSLayoutConstraint.activate([
+            scrollTopButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            scrollTopButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            scrollTopButton.widthAnchor.constraint(equalToConstant: 44),
+            scrollTopButton.heightAnchor.constraint(equalToConstant: 44)
+        ])
+        scrollTopButton.addTarget(self, action: #selector(scrollToTop), for: .touchUpInside)
+    }
+
+    @objc private func scrollToTop() {
+        guard !albums.isEmpty else { return }
+        myCollectionView.scrollToItem(at: IndexPath(item: 0, section: 0), at: .top, animated: true)
+    }
+
+    private func updateScrollTopButtonVisibility(offsetY: CGFloat) {
+        let shouldShow = offsetY > 200
+        let currentlyVisible = scrollTopButton.alpha > 0.5
+        if shouldShow && !currentlyVisible {
+            scrollTopButton.alpha = 1
+        } else if !shouldShow && currentlyVisible {
+            scrollTopButton.alpha = 0
+        }
     }
     
     override func viewDidLayoutSubviews() {
@@ -224,12 +275,10 @@ class AlbumRackViewController: UIViewController,
 // MARK: - UICollectionViewDataSource / Delegate
 extension AlbumRackViewController {
     
-    // ★1セクションに変更
     func numberOfSections(in collectionView: UICollectionView) -> Int {
         return 1
     }
     
-    // ★全件数を返す
     func collectionView(_ collectionView: UICollectionView,
                         numberOfItemsInSection section: Int) -> Int {
         return albumName != nil ? albums.count : recordLists.count
@@ -238,7 +287,7 @@ extension AlbumRackViewController {
     func collectionView(_ collectionView: UICollectionView,
                         cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         
-        let index = indexPath.item  // ★変更
+        let index = indexPath.item
         
         let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: "AlbumCell",
@@ -270,7 +319,7 @@ extension AlbumRackViewController {
     func collectionView(_ collectionView: UICollectionView,
                         didSelectItemAt indexPath: IndexPath) {
         
-        let index = indexPath.item  // ★変更
+        let index = indexPath.item
         
         guard let album = albums[safe: index],
               let albumId = album.id else { return }
@@ -287,7 +336,7 @@ extension AlbumRackViewController {
     func collectionView(_ collectionView: UICollectionView,
                         didDeselectItemAt indexPath: IndexPath) {
         
-        let index = indexPath.item  // ★変更
+        let index = indexPath.item
         
         guard let album = albums[safe: index],
               let albumId = album.id else { return }
@@ -299,6 +348,11 @@ extension AlbumRackViewController {
         }
         
         updateActionButtons()
+    }
+
+    // スクロール検知
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        updateScrollTopButtonVisibility(offsetY: scrollView.contentOffset.y)
     }
 }
 
@@ -355,7 +409,7 @@ extension AlbumRackViewController: UICollectionViewDragDelegate {
     func collectionView(_ collectionView: UICollectionView,
                         itemsForBeginning session: UIDragSession,
                         at indexPath: IndexPath) -> [UIDragItem] {
-        let index = indexPath.item  // ★変更
+        let index = indexPath.item
         guard albums[safe: index] != nil else { return [] }
         let provider = NSItemProvider(object: "\(index)" as NSString)
         let item = UIDragItem(itemProvider: provider)
@@ -372,14 +426,13 @@ extension AlbumRackViewController: UICollectionViewDropDelegate {
               let item = coordinator.items.first,
               let sourceIndexPath = item.sourceIndexPath else { return }
 
-        let srcIndex = sourceIndexPath.item  // ★変更
-        let dstIndex = destinationIndexPath.item  // ★変更
+        let srcIndex = sourceIndexPath.item
+        let dstIndex = destinationIndexPath.item
 
         guard srcIndex != dstIndex,
               albums[safe: srcIndex] != nil,
               albums[safe: dstIndex] != nil else { return }
 
-        // ★moveItemで正しくアニメーション
         collectionView.performBatchUpdates {
             let moved = albums.remove(at: srcIndex)
             albums.insert(moved, at: dstIndex)

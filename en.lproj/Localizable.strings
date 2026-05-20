@@ -98,7 +98,7 @@
 "collection_value_menu" = "Collection Value";
 "open_action" = "Open";
 "about_button" = "About";
-"about_description" = "Information about this app";
+"about_description" = "App information (Displays an external website. Ads are from the site owner and unrelated to in-app purchases.)";
 "data_section" = "DATA";
 "export_data_button" = "Export Data";
 "export_data_description" = "Backup your collection";
@@ -197,3 +197,4 @@
 "close_button" = "Close";
 "sns_discography" = "Discography";
 "align_frame_catno" = "Align the catalog number within the frame";
+"done_button" = "Done";

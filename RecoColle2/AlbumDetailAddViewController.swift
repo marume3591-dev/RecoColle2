@@ -151,7 +151,8 @@ extension AlbumDetailAddViewController: UICollectionViewDataSource {
 extension AlbumDetailAddViewController: UICollectionViewDelegateFlowLayout {
 
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        let cellSize = collectionView.frame.width / 4 - 3
+        let columns: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 8 : 4
+        let cellSize = collectionView.frame.width / columns - 3
         return CGSize(width: cellSize, height: cellSize)
     }
 }

@@ -147,6 +147,17 @@ final class RecordCell: UITableViewCell {
             coverImageView.widthAnchor.constraint(equalToConstant: 90),
             coverImageView.heightAnchor.constraint(equalToConstant: 90)
         ])
+        // 長押しヒントアイコンを追加
+        let moreIcon = UIImageView(image: UIImage(systemName: "ellipsis.circle"))
+        moreIcon.tintColor = .secondaryLabel
+        moreIcon.translatesAutoresizingMaskIntoConstraints = false
+        cardView.addSubview(moreIcon)
+        NSLayoutConstraint.activate([
+            moreIcon.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -10),
+            moreIcon.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -10),
+            moreIcon.widthAnchor.constraint(equalToConstant: 16),
+            moreIcon.heightAnchor.constraint(equalToConstant: 16)
+        ])
     }
     
     // MARK: - Configure

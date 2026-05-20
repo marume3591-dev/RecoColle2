@@ -23,7 +23,41 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
     private let indexStackView = UIStackView()
     private var indexLabels: [UILabel] = []
     private var isFetchingPrices = false
+    // ─── 1. プロパティ追加（クラス上部、他のプロパティと並べる） ───
+    private lazy var scrollToTopButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "arrow.up.circle.fill"), for: .normal)
+        button.tintColor = .systemBlue
+        button.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.9)
+        button.layer.cornerRadius = 28
+        button.layer.shadowColor = UIColor.black.cgColor
+        button.layer.shadowOpacity = 0.2
+        button.layer.shadowRadius = 4
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.alpha = 0
+        button.addTarget(self, action: #selector(scrollToTop), for: .touchUpInside)
+        return button
+    }()
 
+
+    // ─── 2. メソッド追加（extensionの外、ViewController本体に） ───
+    private func setupScrollToTopButton() {
+        view.addSubview(scrollToTopButton)
+        NSLayoutConstraint.activate([
+            scrollToTopButton.trailingAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
+            scrollToTopButton.bottomAnchor.constraint(
+                equalTo: bannerView.topAnchor, constant: -16),
+            scrollToTopButton.widthAnchor.constraint(equalToConstant: 56),
+            scrollToTopButton.heightAnchor.constraint(equalToConstant: 56)
+        ])
+    }
+
+    @objc private func scrollToTop() {
+        guard !sectionArtists.isEmpty else { return }
+        myTableView.scrollToRow(at: IndexPath(row: 0, section: 0), at: .top, animated: true)
+    }
+    
     @IBAction func discogsButtonTapped(_ sender: UIButton) {
         openDiscogs()
     }
@@ -213,6 +247,8 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
                 newRecord.wantsFlg = record["wantsFlg"] as? String ?? "false"
                 newRecord.id = record["id"] as? String ?? UUID().uuidString
                 newRecord.memo = record["memo"] as? String
+                newRecord.catno = record["catno"] as? String
+                newRecord.label = record["label"] as? String
                 newRecord.discogsReleaseId = record["discogsReleaseId"] as? String
 
                 if let imageBase64 = record["albumImage"] as? String,
@@ -345,6 +381,7 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
             emptyLabel.centerYAnchor.constraint(equalTo: emptyView.centerYAnchor)
         ])
         myTableView.backgroundView = emptyView
+        setupScrollToTopButton()
     }
     @objc func openBarcode() {
         let vc = AddViewController2()
@@ -782,8 +819,15 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
         return sectionArtists.firstIndex(where: { String($0.prefix(1)).uppercased() == title }) ?? 0
     }
 
-    func scrollViewDidScroll(_ scrollView: UIScrollView) { updateIndexHighlight() }
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        updateIndexHighlight()
 
+        let shouldShow = scrollView.contentOffset.y > 300
+        UIView.animate(withDuration: 0.2) {
+            self.scrollToTopButton.alpha = shouldShow ? 1 : 0
+        }
+    }
+    
     private func updateIndexHighlight() {
         guard let firstVisible = myTableView.indexPathsForVisibleRows?.first else { return }
         let currentSection = firstVisible.section

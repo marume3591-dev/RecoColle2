@@ -31,7 +31,7 @@ class LibraryViewController: UIViewController {
 
     private lazy var collectionView: UICollectionView = {
         let spacing: CGFloat = 2
-        let columns: CGFloat = 3
+        let columns: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 8 : 3
         let width = (UIScreen.main.bounds.width - spacing * (columns - 1)) / columns
         let layout = UICollectionViewFlowLayout()
         layout.itemSize = CGSize(width: width, height: width)
@@ -47,7 +47,7 @@ class LibraryViewController: UIViewController {
         let tv = UITableView(frame: .zero, style: .plain)
         tv.translatesAutoresizingMaskIntoConstraints = false
         tv.isHidden = true
-        tv.rowHeight = 100
+        tv.rowHeight = UIDevice.current.userInterfaceIdiom == .pad ? 160 : 100
         return tv
     }()
 
@@ -59,6 +59,23 @@ class LibraryViewController: UIViewController {
     }()
 
     private var bannerHeightConstraint: NSLayoutConstraint!
+
+    // スクロールトップボタン
+    private let scrollTopButton: UIButton = {
+        let button = UIButton(type: .system)
+        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+        button.setImage(UIImage(systemName: "arrow.up", withConfiguration: config), for: .normal)
+        button.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.85)
+        button.tintColor = .white
+        button.layer.cornerRadius = 22
+        button.layer.shadowColor = UIColor.black.cgColor
+        button.layer.shadowOpacity = 0.25
+        button.layer.shadowOffset = CGSize(width: 0, height: 2)
+        button.layer.shadowRadius = 4
+        button.alpha = 0
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
 
     // MARK: - Lifecycle
 
@@ -77,6 +94,7 @@ class LibraryViewController: UIViewController {
         setupTableView()
         setupNavigationBar()
         setupSegmentStyle()
+        setupScrollTopButton()
     }
 
     private func setupSegmentStyle() {
@@ -105,6 +123,11 @@ class LibraryViewController: UIViewController {
         loadData()
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        view.bringSubviewToFront(scrollTopButton)
+    }
+
     // MARK: - Layout
 
     private func setupLayout() {
@@ -126,15 +149,49 @@ class LibraryViewController: UIViewController {
             collectionView.bottomAnchor.constraint(equalTo: bannerView.topAnchor),
 
             tableView.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: 8),
-            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: bannerView.topAnchor),
+            tableView.widthAnchor.constraint(lessThanOrEqualToConstant: 600),
+            tableView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            tableView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor),
+            tableView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor),
 
             bannerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             bannerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             bannerView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
             bannerHeightConstraint,
         ])
+    }
+
+    // MARK: - ScrollTopButton
+
+    private func setupScrollTopButton() {
+        view.addSubview(scrollTopButton)
+        view.bringSubviewToFront(scrollTopButton)
+        NSLayoutConstraint.activate([
+            scrollTopButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            scrollTopButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            scrollTopButton.widthAnchor.constraint(equalToConstant: 44),
+            scrollTopButton.heightAnchor.constraint(equalToConstant: 44)
+        ])
+        scrollTopButton.addTarget(self, action: #selector(scrollToTop), for: .touchUpInside)
+    }
+
+    @objc private func scrollToTop() {
+        if segmentedControl.selectedSegmentIndex == 0 {
+            collectionView.scrollToItem(at: IndexPath(item: 0, section: 0), at: .top, animated: true)
+        } else {
+            tableView.scrollToRow(at: IndexPath(row: 0, section: 0), at: .top, animated: true)
+        }
+    }
+
+    private func updateScrollTopButtonVisibility(offsetY: CGFloat) {
+        let shouldShow = offsetY > 200
+        let currentlyVisible = scrollTopButton.alpha > 0.5
+        if shouldShow && !currentlyVisible {
+            scrollTopButton.alpha = 1
+        } else if !shouldShow && currentlyVisible {
+            scrollTopButton.alpha = 0
+        }
     }
 
     // MARK: - NavigationBar
@@ -171,6 +228,8 @@ class LibraryViewController: UIViewController {
             ? NSLocalizedString("library_title", comment: "")
             : NSLocalizedString("album_title", comment: "")
         updateNavBar()
+        // セグメント切替時はボタンを非表示
+        scrollTopButton.alpha = 0
         loadData()
     }
 
@@ -363,11 +422,11 @@ class LibraryViewController: UIViewController {
 // MARK: - UICollectionView
 
 extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataSource {
-    
+
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         allRecords.count
     }
-    
+
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "LibraryCell", for: indexPath) as! LibraryCell
         let record = allRecords[indexPath.item]
@@ -379,7 +438,7 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
         }
         return cell
     }
-    
+
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let record = allRecords[indexPath.item]
         let storyboard = UIStoryboard(name: "Main", bundle: nil)
@@ -389,6 +448,14 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
         vc.mode = .edit
         vc.record = record
         navigationController?.pushViewController(vc, animated: true)
+    }
+
+    // コレクションビューのスクロール検知
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        // tableView のスクロールと区別
+        if scrollView == collectionView || scrollView == tableView {
+            updateScrollTopButtonVisibility(offsetY: scrollView.contentOffset.y)
+        }
     }
 }
 
@@ -510,8 +577,8 @@ class AlbumTableViewCell: UITableViewCell {
         NSLayoutConstraint.activate([
             thumbImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
             thumbImageView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            thumbImageView.widthAnchor.constraint(equalToConstant: 84),
-            thumbImageView.heightAnchor.constraint(equalToConstant: 84),
+            thumbImageView.widthAnchor.constraint(equalToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 140 : 84),
+            thumbImageView.heightAnchor.constraint(equalToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 140 : 84),
             nameLabel.leadingAnchor.constraint(equalTo: thumbImageView.trailingAnchor, constant: 12),
             nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
             nameLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 24),

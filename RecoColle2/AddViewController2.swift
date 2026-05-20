@@ -484,7 +484,7 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
                                 URLSession.shared.dataTask(with: url) { data, _, _ in
                                     if let data = data, let image = UIImage(data: data) {
                                         DispatchQueue.main.async {
-                                            let resized = image.resize(targetSize: CGSize(width: 200, height: 200))
+                                            let resized = image.resize(targetSize: CGSize(width: 400, height: 400))
                                             self.albumImage.image = resized
                                             self.resizedPicture = resized
                                         }
@@ -515,19 +515,19 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
             }
             return
         }
-        
+
         let userAgent = "RecoColle2/1.0 (marume3591@icloud.com)"
         let key = "VTvQRnPmaaybKvVDYsej"
         let secret = "VKFSjBMuqcgsAdmMvUzfoeLlsQbGYqdE"
-        
+
         let query = "\(artist) \(title)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let urlString = "https://api.discogs.com/database/search?q=\(query)&type=release&key=\(key)&secret=\(secret)"
-        
+        let urlString = "https://api.discogs.com/database/search?q=\(query)&type=release&per_page=50&page=1&key=\(key)&secret=\(secret)"
+
         guard let url = URL(string: urlString) else { return }
-        
+
         var request = URLRequest(url: url)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-        
+
         URLSession.shared.dataTask(with: request) { data, _, error in
             guard let data = data, error == nil else {
                 DispatchQueue.main.async { self.showAlert(NSLocalizedString("discogs_search_failed", comment: "")) }
@@ -543,27 +543,19 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
             do {
                 if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let results = json["results"] as? [[String: Any]] {
-                    
-                    let filteredResults = results.filter { item in
-                        guard let itemTitle = item["title"] as? String else { return false }
-                        let separators: [Character] = ["–", "-"]
-                        let parts = itemTitle.split(whereSeparator: { separators.contains($0) })
-                            .map { $0.trimmingCharacters(in: .whitespaces) }
-                        let itemArtist = parts.count > 0 ? parts[0].uppercased() : ""
-                        let itemAlbum  = parts.count > 1 ? parts[1].uppercased() : parts[0].uppercased()
-                        return itemArtist.contains(artist.uppercased()) && itemAlbum.contains(title.uppercased())
-                    }
-                    
+
+                    let totalPages = (json["pagination"] as? [String: Any])?["pages"] as? Int ?? 1
+
                     let group = DispatchGroup()
                     var resultsWithYear: [[String: Any]] = []
-                    
-                    for var item in filteredResults {
+
+                    for var item in results {
                         if let releaseID = item["id"] as? Int {
                             group.enter()
                             let detailURL = URL(string: "https://api.discogs.com/releases/\(releaseID)?key=\(key)&secret=\(secret)")!
                             var detailRequest = URLRequest(url: detailURL)
                             detailRequest.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-                            
+
                             URLSession.shared.dataTask(with: detailRequest) { data, _, _ in
                                 defer { group.leave() }
                                 guard let data = data,
@@ -581,15 +573,19 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
                             resultsWithYear.append(item)
                         }
                     }
-                    
+
                     group.notify(queue: .main) {
                         if resultsWithYear.isEmpty {
                             self.showAlert(NSLocalizedString("no_matching_releases", comment: ""))
                         } else {
-                            self.showOCRResultList(resultsWithYear, title: NSLocalizedString("link_discogs", comment: ""))
+                            let q = DiscogsSearchQuery.text("\(artist) \(title)")
+                            self.showOCRResultList(resultsWithYear,
+                                                   title: NSLocalizedString("link_discogs", comment: ""),
+                                                   query: q,
+                                                   totalPages: totalPages)
                         }
                     }
-                    
+
                 } else {
                     DispatchQueue.main.async { self.showAlert(NSLocalizedString("no_discogs_results", comment: "")) }
                 }
@@ -598,17 +594,22 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
             }
         }.resume()
     }
-    
-    func showOCRResultList(_ ocrResults: [[String: Any]], title: String = "OCR Results") {
-        let vc = OCRResultViewController(style: .plain)
+
+    // ★ showOCRResultList：query と totalPages を受け取りページネーション対応
+    func showOCRResultList(_ ocrResults: [[String: Any]],
+                           title: String = "OCR Results",
+                           query: DiscogsSearchQuery? = nil,
+                           totalPages: Int = 1) {
+        let vc = OCRResultViewController()
         vc.results = ocrResults
         vc.title = title
+        vc.searchQuery = query
+        vc.setInitialPagination(currentPage: 1, totalPages: totalPages)
         vc.onSelect = { [weak self] selected in
             self?.applyDiscogsResult(selected)
         }
         navigationController?.pushViewController(vc, animated: true)
         self.ocrResults = []
-
     }
 
     func applyDiscogsResult(_ first: [String: Any]) {
@@ -634,7 +635,7 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
         if let url = URL(string: coverURL) {
             URLSession.shared.dataTask(with: url) { data, _, _ in
                 guard let data = data, let img = UIImage(data: data) else { return }
-                let resized = img.resize(targetSize: CGSize(width: 200, height: 200))
+                let resized = img.resize(targetSize: CGSize(width: 400, height: 400))
                 DispatchQueue.main.async {
                     self.albumImage.image = resized
                     self.resizedPicture = resized
@@ -767,9 +768,11 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
         NotificationCenter.default.addObserver(self, selector: #selector(hidekeyboard), name: UIResponder.keyboardWillHideNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(premiumUpdated), name: .premiumStatusChanged, object: nil)
         
-        let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
-        tap.cancelsTouchesInView = false
-        view.addGestureRecognizer(tap)
+        if let scrollView = view.subviews.first(where: { $0 is UIScrollView }) {
+            let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+            tap.cancelsTouchesInView = false
+            scrollView.addGestureRecognizer(tap)
+        }
         
         albumImage.layer.borderColor = UIColor.systemGray2.cgColor
         albumImage.layer.borderWidth = 1
@@ -899,36 +902,6 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
         }
     }
 
-//    private func hasUnsavedChanges() -> Bool {
-//        if mode == .edit {
-//            if (textField.text ?? "")       != initialArtist           { return true }
-//            if (textField2.text ?? "")      != initialTitle            { return true }
-//            if (formatTextField.text ?? "") != initialFormat           { return true }
-//            if (textField3.text ?? "")      != initialCountry          { return true }
-//            if (textField4.text ?? "")      != initialYear             { return true }
-//            if (memoTextView.text ?? "")    != initialMemo             { return true }
-//            if wantsFlg                     != initialWantsFlg         { return true }
-//            if resizedPicture               != nil                     { return true }
-//            if pendingDiscogsReleaseId      != initialDiscogsReleaseId { return true }
-//            if pendingPriceLow              != initialPriceLow         { return true }
-//            if pendingPriceUpdatedAt        != initialPriceUpdatedAt   { return true }
-//            let currentCatno = (view.viewWithTag(4001) as? UITextField)?.text
-//            let currentLabel = (view.viewWithTag(4002) as? UITextField)?.text
-//            if (currentCatno ?? "") != (initialCatno ?? "") { return true }
-//            if (currentLabel ?? "") != (initialLabel ?? "") { return true }
-//            return false
-//        } else {
-//            if !(textField.text ?? "").isEmpty { return true }
-//            if !(textField2.text ?? "").isEmpty { return true }
-//            if !(memoTextView.text ?? "").isEmpty { return true }
-//            if resizedPicture != nil { return true }
-//            let currentCatno = (view.viewWithTag(4001) as? UITextField)?.text ?? ""
-//            let currentLabel = (view.viewWithTag(4002) as? UITextField)?.text ?? ""
-//            if !currentCatno.isEmpty { return true }
-//            if !currentLabel.isEmpty { return true }
-//        }
-//        return false
-//    }
     private func hasUnsavedChanges() -> Bool {
         print("---hasUnsavedChanges---")
 
@@ -989,8 +962,6 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
                 return true
             }
 
-            //if wantsFlg != "0" { return true }
-
             if resizedPicture != nil { return true }
 
             if !currentCatno
@@ -1008,6 +979,7 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
 
         return false
     }
+
     func setupUI() {
         let scrollView = UIScrollView()
         let contentView = UIView()
@@ -1349,10 +1321,9 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
         let resizedForOCR = image.resize(targetSize: CGSize(width: 1024, height: 1024))
         self.ocrImage = resizedForOCR
         if !shouldRunOCR {
-            let resized = image.resize(targetSize: CGSize(width: 200, height: 200))
+            let resized = image.resize(targetSize: CGSize(width: 400, height: 400))
             self.albumImage.image = resized
             self.resizedPicture = resized
-            //self.image = nil
         }
         if shouldRunOCR {
             let service = SpineOCRService()
@@ -1429,12 +1400,14 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
         present(picker, animated: true)
     }
 
+    // ★ fetchDiscogsInfoByOCRTexts：pagination 対応
     func fetchDiscogsInfoByOCRTexts(_ texts: [String]) {
         let key = "VTvQRnPmaaybKvVDYsej"
         let secret = "VKFSjBMuqcgsAdmMvUzfoeLlsQbGYqdE"
         let userAgent = "RecoColle2/1.0"
-        let query = texts.joined(separator: " ").addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let urlString = "https://api.discogs.com/database/search?q=\(query)&type=release&key=\(key)&secret=\(secret)"
+        let queryString = texts.joined(separator: " ")
+        let query = queryString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let urlString = "https://api.discogs.com/database/search?q=\(query)&type=release&per_page=50&page=1&key=\(key)&secret=\(secret)"
         guard let url = URL(string: urlString) else { return }
         var request = URLRequest(url: url)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
@@ -1445,15 +1418,20 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
                 DispatchQueue.main.async { self.showAlert(NSLocalizedString("no_ocr_results", comment: "")) }
                 return
             }
-            DispatchQueue.main.async { self.showOCRResultList(results) }
+            let totalPages = (json["pagination"] as? [String: Any])?["pages"] as? Int ?? 1
+            let q = DiscogsSearchQuery.text(queryString)
+            DispatchQueue.main.async {
+                self.showOCRResultList(results, query: q, totalPages: totalPages)
+            }
         }.resume()
     }
-    
+
+    // ★ fetchDiscogsInfoByCatNo：pagination 対応
     func fetchDiscogsInfoByCatNo(_ catNo: String) {
         let key = "VTvQRnPmaaybKvVDYsej"
         let secret = "VKFSjBMuqcgsAdmMvUzfoeLlsQbGYqdE"
         let encoded = catNo.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let urlString = "https://api.discogs.com/database/search?catno=\(encoded)&type=release&key=\(key)&secret=\(secret)"
+        let urlString = "https://api.discogs.com/database/search?catno=\(encoded)&type=release&per_page=50&page=1&key=\(key)&secret=\(secret)"
         guard let url = URL(string: urlString) else { return }
         URLSession.shared.dataTask(with: url) { data, _, _ in
             guard let data = data,
@@ -1462,6 +1440,7 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
                 self.showAlert(NSLocalizedString("no_catno_results", comment: ""))
                 return
             }
+            let totalPages = (json["pagination"] as? [String: Any])?["pages"] as? Int ?? 1
             let group = DispatchGroup()
             var resultsWithYear: [[String: Any]] = []
             for var item in results {
@@ -1483,7 +1462,10 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
                     resultsWithYear.append(item)
                 }
             }
-            group.notify(queue: .main) { self.showOCRResultList(resultsWithYear) }
+            group.notify(queue: .main) {
+                let q = DiscogsSearchQuery.catno(catNo)
+                self.showOCRResultList(resultsWithYear, query: q, totalPages: totalPages)
+            }
         }.resume()
     }
     
@@ -1552,6 +1534,7 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
         view.layer.borderColor = UIColor.systemGray2.cgColor
         view.layer.cornerRadius = 6
         view.heightAnchor.constraint(equalToConstant: 80).isActive = true
+        view.inputAccessoryView = makeKeyboardToolbar()
         let stack = UIStackView(arrangedSubviews: [label, view])
         stack.axis = .vertical; stack.spacing = 4
         return stack
@@ -1565,6 +1548,21 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
         field.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 8, height: 0))
         field.leftViewMode = .always
         field.heightAnchor.constraint(equalToConstant: 34).isActive = true
+        field.inputAccessoryView = makeKeyboardToolbar()
+    }
+
+    private func makeKeyboardToolbar() -> UIToolbar {
+        let toolbar = UIToolbar()
+        toolbar.sizeToFit()
+        let space = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+        let done = UIBarButtonItem(
+            title: NSLocalizedString("done_button", comment: "Done"),
+            style: .done,
+            target: self,
+            action: #selector(dismissKeyboard)
+        )
+        toolbar.items = [space, done]
+        return toolbar
     }
 
     func startOCRScanning() {
@@ -1981,6 +1979,7 @@ extension AddViewController2: SHSessionDelegate {
         }.resume()
     }
 
+    // ★ fetchDiscogsInfoByShazam：Shazamは2クエリ合算のためページネーションなし
     func fetchDiscogsInfoByShazam(artist: String, title: String, song: String? = nil) {
         let key = "VTvQRnPmaaybKvVDYsej"
         let secret = "VKFSjBMuqcgsAdmMvUzfoeLlsQbGYqdE"
@@ -2023,7 +2022,11 @@ extension AddViewController2: SHSessionDelegate {
                 self.showAlert(NSLocalizedString("no_results", comment: ""))
                 return
             }
-            self.showOCRResultList(unique, title: NSLocalizedString("shazam_results", comment: ""))
+            // Shazamは2クエリ合算のためページネーションなし（totalPages: 1）
+            self.showOCRResultList(unique,
+                                   title: NSLocalizedString("shazam_results", comment: ""),
+                                   query: nil,
+                                   totalPages: 1)
         }
     }
 }
