@@ -29,15 +29,15 @@ class LibraryViewController: UIViewController {
         return sc
     }()
 
-    private lazy var collectionView: UICollectionView = {
-        let spacing: CGFloat = 2
-        let columns: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 8 : 3
-        let width = (UIScreen.main.bounds.width - spacing * (columns - 1)) / columns
+    private let collectionViewLayout: UICollectionViewFlowLayout = {
         let layout = UICollectionViewFlowLayout()
-        layout.itemSize = CGSize(width: width, height: width)
-        layout.minimumInteritemSpacing = spacing
-        layout.minimumLineSpacing = spacing
-        let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        layout.minimumInteritemSpacing = 2
+        layout.minimumLineSpacing = 2
+        return layout
+    }()
+
+    private lazy var collectionView: UICollectionView = {
+        let cv = UICollectionView(frame: .zero, collectionViewLayout: collectionViewLayout)
         cv.translatesAutoresizingMaskIntoConstraints = false
         cv.backgroundColor = .systemBackground
         return cv
@@ -150,16 +150,30 @@ class LibraryViewController: UIViewController {
 
             tableView.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: 8),
             tableView.bottomAnchor.constraint(equalTo: bannerView.topAnchor),
-            tableView.widthAnchor.constraint(lessThanOrEqualToConstant: 600),
-            tableView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            tableView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor),
-            tableView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor),
+            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 
             bannerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             bannerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             bannerView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
             bannerHeightConstraint,
         ])
+    }
+
+    // MARK: - Layout Updates (rotation / iPad split view)
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        updateCollectionViewLayout()
+    }
+
+    private func updateCollectionViewLayout() {
+        let spacing: CGFloat = 2
+        let columns: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 8 : 3
+        let totalWidth = collectionView.bounds.width
+        guard totalWidth > 0 else { return }
+        let cellWidth = floor((totalWidth - spacing * (columns - 1)) / columns)
+        collectionViewLayout.itemSize = CGSize(width: cellWidth, height: cellWidth)
     }
 
     // MARK: - ScrollTopButton
@@ -411,10 +425,15 @@ class LibraryViewController: UIViewController {
         ImobileSdkAds.setTestMode(fromAppDelegate.globalTestMode)
         ImobileSdkAds.register(withPublisherID: pid, mediaID: mid, spotID: sid)
         DispatchQueue.global().async { ImobileSdkAds.start(bySpotID: sid) }
-        let adSize = CGSize(width: 320, height: 50)
-        let x = (UIScreen.main.bounds.width - adSize.width) / 2
-        let adView = UIView(frame: CGRect(x: x, y: 0, width: adSize.width, height: adSize.height))
+        let adView = UIView()
+        adView.translatesAutoresizingMaskIntoConstraints = false
         bannerView.addSubview(adView)
+        NSLayoutConstraint.activate([
+            adView.centerXAnchor.constraint(equalTo: bannerView.centerXAnchor),
+            adView.centerYAnchor.constraint(equalTo: bannerView.centerYAnchor),
+            adView.widthAnchor.constraint(equalToConstant: 320),
+            adView.heightAnchor.constraint(equalToConstant: 50),
+        ])
         ImobileSdkAds.showBySpotID(forAdMobMediation: sid, view: adView)
     }
 }
@@ -467,7 +486,9 @@ extension LibraryViewController: UITableViewDelegate, UITableViewDataSource {
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { 1 }
 
-    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat { 100 }
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        return UIDevice.current.userInterfaceIdiom == .pad ? 120 : 100
+    }
 
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat { .leastNormalMagnitude }
 
@@ -575,10 +596,10 @@ class AlbumTableViewCell: UITableViewCell {
         contentView.addSubview(nameLabel)
         contentView.addSubview(countLabel)
         NSLayoutConstraint.activate([
-            thumbImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
+            thumbImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
             thumbImageView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            thumbImageView.widthAnchor.constraint(equalToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 140 : 84),
-            thumbImageView.heightAnchor.constraint(equalToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 140 : 84),
+            thumbImageView.widthAnchor.constraint(equalToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 100 : 84),
+            thumbImageView.heightAnchor.constraint(equalToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 100 : 84),
             nameLabel.leadingAnchor.constraint(equalTo: thumbImageView.trailingAnchor, constant: 12),
             nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
             nameLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 24),

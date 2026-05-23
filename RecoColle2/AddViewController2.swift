@@ -1303,11 +1303,15 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
         ImobileSdkAds.register(withPublisherID: IMOBILE_BANNER_PID, mediaID: IMOBILE_BANNER_MID, spotID: IMOBILE_BANNER_SID)
         DispatchQueue.global().async { ImobileSdkAds.start(bySpotID: IMOBILE_BANNER_SID) }
         
-        let imobileAdSize = CGSize(width: 320, height: 50)
-        let screenSize = UIScreen.main.bounds.size
-        let x = (screenSize.width - imobileAdSize.width) / 2
-        let adView = UIView(frame: CGRect(x: x, y: 0, width: imobileAdSize.width, height: imobileAdSize.height))
+        let adView = UIView()
+        adView.translatesAutoresizingMaskIntoConstraints = false
         bannerView.addSubview(adView)
+        NSLayoutConstraint.activate([
+            adView.centerXAnchor.constraint(equalTo: bannerView.centerXAnchor),
+            adView.centerYAnchor.constraint(equalTo: bannerView.centerYAnchor),
+            adView.widthAnchor.constraint(equalToConstant: 320),
+            adView.heightAnchor.constraint(equalToConstant: 50),
+        ])
         ImobileSdkAds.showBySpotID(forAdMobMediation: IMOBILE_BANNER_SID, view: adView)
     }
     
@@ -1368,6 +1372,7 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
                 let urlString = "https://www.discogs.com/search/?q=\(query)&type=release"
                 let webView = self.storyboard?.instantiateViewController(withIdentifier: "MyWebView") as! WebViewController
                 webView.url = urlString
+                webView.modalPresentationStyle = .fullScreen
                 self.present(webView, animated: true, completion: nil)
             })
         }

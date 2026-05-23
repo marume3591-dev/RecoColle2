@@ -70,6 +70,76 @@ struct SettingsButtonsView: View {
                     controller.present(vc, animated: true)
                 }
                 
+                // TIPS
+                sectionTitle(LocalizedStringKey("tips_section"))
+
+                // Discogs共有の使い方説明
+                HStack(alignment: .top, spacing: 16) {
+                    SwiftUI.Image(systemName: "square.and.arrow.up.on.square")
+                        .font(Font.title3)
+                        .foregroundColor(.purple)
+                        .frame(width: 28)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(LocalizedStringKey("discogs_share_title"))
+                            .font(.body)
+                            .foregroundColor(.primary)
+                        Text(LocalizedStringKey("discogs_share_description"))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(12)
+                // アルバム削除方法
+                HStack(alignment: .top, spacing: 16) {
+                    SwiftUI.Image(systemName: "trash")
+                        .font(Font.title3)
+                        .foregroundColor(.red)
+                        .frame(width: 28)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(LocalizedStringKey("album_delete_title"))
+                            .font(.body)
+                            .foregroundColor(.primary)
+                        Text(LocalizedStringKey("album_delete_description"))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(12)
+                // SNS投稿ネタ収集
+                HStack(alignment: .top, spacing: 16) {
+                    SwiftUI.Image(systemName: "hand.tap")
+                        .font(Font.title3)
+                        .foregroundColor(.pink)
+                        .frame(width: 28)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(LocalizedStringKey("sns_longpress_title"))
+                            .font(.body)
+                            .foregroundColor(.primary)
+                        Text(LocalizedStringKey("sns_longpress_description"))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(12)
+
                 // DATA
                 sectionTitle(LocalizedStringKey("data_section"))
 

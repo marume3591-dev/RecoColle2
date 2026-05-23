@@ -23,7 +23,13 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
     private let indexStackView = UIStackView()
     private var indexLabels: [UILabel] = []
     private var isFetchingPrices = false
-    // ─── 1. プロパティ追加（クラス上部、他のプロパティと並べる） ───
+    private var isSearchBarVisible = UserDefaults.standard.bool(forKey: "isSearchBarVisible") {
+        didSet {
+            UserDefaults.standard.set(isSearchBarVisible, forKey: "isSearchBarVisible")
+        }
+    }
+    private var searchIndicator: UIImageView?    // ← プロパティに追加
+
     private lazy var scrollToTopButton: UIButton = {
         let button = UIButton(type: .system)
         button.setImage(UIImage(systemName: "arrow.up.circle.fill"), for: .normal)
@@ -39,8 +45,6 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
         return button
     }()
 
-
-    // ─── 2. メソッド追加（extensionの外、ViewController本体に） ───
     private func setupScrollToTopButton() {
         view.addSubview(scrollToTopButton)
         NSLayoutConstraint.activate([
@@ -104,7 +108,6 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
         if ReviewManager.shared.shouldShowReviewAlert() {
             showReviewAlert()
         }
-        // Widget対応の案内（一度だけ）
         let widgetAnnouncedKey = "widgetAnnouncementShown"
         if !UserDefaults.standard.bool(forKey: widgetAnnouncedKey) {
             UserDefaults.standard.set(true, forKey: widgetAnnouncedKey)
@@ -150,11 +153,9 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
                 print("error")
             }
         }
-        // 初回のみ＋ボタンをパルス
         if !UserDefaults.standard.bool(forKey: "addButtonPulsed") {
             UserDefaults.standard.set(true, forKey: "addButtonPulsed")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                // サンプルデータがある場合は削除を促すトースト
                 let hasSample = self.recordLists.contains { $0.memo == "__sample__" }
                 if hasSample {
                     self.showToast(message: NSLocalizedString("sample_hint_toast", comment: ""))
@@ -208,7 +209,7 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
             preferredStyle: .alert
         )
         alert.addAction(UIAlertAction(title: NSLocalizedString("not_now_button", comment: ""), style: .cancel) { _ in
-            ReviewManager.shared.snooze(days: 7) // 7日間スヌーズ
+            ReviewManager.shared.snooze(days: 7)
         })
         alert.addAction(UIAlertAction(title: NSLocalizedString("review_button", comment: ""), style: .default, handler: { _ in
             ReviewManager.shared.requestReview()
@@ -317,33 +318,29 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
             image: UIImage(systemName: "chart.pie")
         ) { _ in self.openCollectionStats() }
 
-
         let menu = UIMenu(title: "", children: [discogsAction, valueAction, statsAction])
         let menuButton = UIBarButtonItem(image: UIImage(systemName: "ellipsis.circle"), primaryAction: nil, menu: menu)
 
         navigationItem.leftBarButtonItem = menuButton
-        //navigationItem.rightBarButtonItem = addButtonItem
+
         let barcodeItem = UIBarButtonItem(
             image: UIImage(systemName: "barcode.viewfinder"),
             style: .plain,
             target: self,
             action: #selector(openBarcode)
         )
-
         let catNoItem = UIBarButtonItem(
             image: UIImage(systemName: "number.square"),
             style: .plain,
             target: self,
             action: #selector(openCatNo)
         )
-
         let ocrItem = UIBarButtonItem(
             image: UIImage(systemName: "text.viewfinder"),
             style: .plain,
             target: self,
             action: #selector(openOCR)
         )
-
         let shazamItem = UIBarButtonItem(
             image: UIImage(systemName: "music.note"),
             style: .plain,
@@ -382,7 +379,67 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
         ])
         myTableView.backgroundView = emptyView
         setupScrollToTopButton()
+
+        // 初期状態は検索バーを表示
+        searchBar.isHidden = !isSearchBarVisible
+
+        // セグメントコントロールの上にタップ検知ビューを追加
+        let tapArea = UIView()
+        tapArea.translatesAutoresizingMaskIntoConstraints = false
+        tapArea.isUserInteractionEnabled = true
+        view.addSubview(tapArea)
+
+        NSLayoutConstraint.activate([
+            tapArea.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tapArea.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tapArea.bottomAnchor.constraint(equalTo: segmentedControl.topAnchor),
+            tapArea.heightAnchor.constraint(equalToConstant: 20)
+        ])
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(toggleSearchBar))
+        tapArea.addGestureRecognizer(tap)
+
+        // インジケーター（初期は開いている状態なので上向き）
+        let indicator = UIImageView()
+        indicator.image = UIImage(systemName: "chevron.compact.down")
+        indicator.tintColor = .secondaryLabel
+        indicator.contentMode = .scaleAspectFit
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.transform = isSearchBarVisible
+            ? CGAffineTransform(rotationAngle: .pi)
+            : .identity
+        tapArea.addSubview(indicator)
+        NSLayoutConstraint.activate([
+            indicator.centerXAnchor.constraint(equalTo: tapArea.centerXAnchor),
+            indicator.centerYAnchor.constraint(equalTo: tapArea.centerYAnchor),
+            indicator.widthAnchor.constraint(equalToConstant: 36),
+            indicator.heightAnchor.constraint(equalToConstant: 20)
+        ])
+        searchIndicator = indicator // ← プロパティに保持
     }
+
+    @objc func toggleSearchBar() {
+        isSearchBarVisible.toggle()
+
+        UIView.animate(withDuration: 0.25) {
+            self.searchBar.isHidden = !self.isSearchBarVisible
+            // 開いているとき上向き(π)、閉じているとき下向き(0)
+            self.searchIndicator?.transform = self.isSearchBarVisible
+                ? CGAffineTransform(rotationAngle: .pi)
+                : .identity
+            self.view.layoutIfNeeded()
+        }
+
+        if !isSearchBarVisible {
+            searchBar.text = nil
+            searchBar.resignFirstResponder()
+            getData()
+            myTableView.reloadData()
+        } else {
+            searchBar.becomeFirstResponder()
+        }
+    }
+
     @objc func openBarcode() {
         let vc = AddViewController2()
         vc.launchMode = .barcode
@@ -419,7 +476,6 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
         navigationController?.pushViewController(vc, animated: true)
     }
 
-    // ViewController に追加
     private func showPaywall() {
         let alert = UIAlertController(
             title: NSLocalizedString("unlock_premium_title", comment: ""),
@@ -463,6 +519,7 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
         let vc = UIHostingController(rootView: CollectionValueView())
         navigationController?.pushViewController(vc, animated: true)
     }
+
     @objc func openCollectionStats() {
         guard PremiumManager.shared.isPremiumUser() else {
             let alert = UIAlertController(
@@ -503,7 +560,6 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
             for (rowIndex, record) in records.enumerated() {
                 if record.artistName == artistName && record.albumTitle == albumTitle {
                     let indexPath = IndexPath(row: rowIndex, section: sectionIndex)
-                    // アニメーションなしで一瞬で移動
                     self.myTableView.scrollToRow(at: indexPath, at: .middle, animated: false)
                     return
                 }
@@ -526,11 +582,15 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
         ImobileSdkAds.setTestMode(fromAppDelegate.globalTestMode)
         ImobileSdkAds.register(withPublisherID: IMOBILE_BANNER_PID, mediaID: IMOBILE_BANNER_MID, spotID: IMOBILE_BANNER_SID)
         DispatchQueue.global().async { ImobileSdkAds.start(bySpotID: IMOBILE_BANNER_SID) }
-        let imobileAdSize = CGSize(width: 320, height: 50)
-        let screenSize = UIScreen.main.bounds.size
-        let imobileAdPosX: CGFloat = (screenSize.width - imobileAdSize.width) / 2
-        let imobileAdView = UIView(frame: CGRect(x: imobileAdPosX, y: 0, width: imobileAdSize.width, height: imobileAdSize.height))
+        let imobileAdView = UIView()
+        imobileAdView.translatesAutoresizingMaskIntoConstraints = false
         bannerView.addSubview(imobileAdView)
+        NSLayoutConstraint.activate([
+            imobileAdView.centerXAnchor.constraint(equalTo: bannerView.centerXAnchor),
+            imobileAdView.centerYAnchor.constraint(equalTo: bannerView.centerYAnchor),
+            imobileAdView.widthAnchor.constraint(equalToConstant: 320),
+            imobileAdView.heightAnchor.constraint(equalToConstant: 50),
+        ])
         ImobileSdkAds.showBySpotID(forAdMobMediation: IMOBILE_BANNER_SID, view: imobileAdView)
     }
 
@@ -569,9 +629,8 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
             releaseYear: record.releaseDate,
             price: priceText,
             image: image,
-            isNoImage: !hasImage  // ← 追加
+            isNoImage: !hasImage
         )
-        // サンプルバッジ
         if record.memo == "__sample__" {
             let badge = UILabel()
             badge.text = NSLocalizedString("sample_badge", comment: "")
@@ -654,7 +713,6 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
         }
         updateSegmentTitles()
         myTableView.backgroundView?.isHidden = !recordLists.isEmpty
-
     }
 
     func fetchAllPrices() {
@@ -821,7 +879,6 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         updateIndexHighlight()
-
         let shouldShow = scrollView.contentOffset.y > 300
         UIView.animate(withDuration: 0.2) {
             self.scrollToTopButton.alpha = shouldShow ? 1 : 0
@@ -909,8 +966,6 @@ extension ViewController: UIContextMenuInteractionDelegate {
                 addVC.record = record
                 self.navigationController?.pushViewController(addVC, animated: true)
             }
-            
-            // ↓ここを追加
             let snsAction = UIAction(
                 title: NSLocalizedString("sns_menu_title", comment: ""),
                 image: UIImage(systemName: "sparkles")
@@ -918,8 +973,6 @@ extension ViewController: UIContextMenuInteractionDelegate {
                 let vc = UIHostingController(rootView: SNSPostHintView(record: record))
                 self.navigationController?.pushViewController(vc, animated: true)
             }
-            
-            // ↓childrenにsnsActionを追加するだけ
             return UIMenu(title: "", children: [openAction, snsAction])
         })
     }

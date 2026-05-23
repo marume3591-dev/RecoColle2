@@ -36,7 +36,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         
         migrateCatnoFromMemo()
         saveTodayRecordForWidget()
-        
+        UserDefaults.standard.register(defaults: ["isSearchBarVisible": true])
+
         return true
     }
     private func migrateCatnoFromMemo() {

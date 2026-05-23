@@ -5,6 +5,11 @@ class MainTabBarController: UITabBarController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        // iOS 18以降iPadでタブバーが上部に移動するのを防ぐ
+        if #available(iOS 18.0, *) {
+            traitOverrides.horizontalSizeClass = .compact
+        }
+
         let discogsAction = UIAction(
             title: "Open Discogs",
             image: UIImage(systemName: "safari")

@@ -198,3 +198,10 @@
 "sns_discography" = "ディスコグラフィー";
 "align_frame_catno" = "レコード番号を枠内に合わせてください";
 "done_button" = "完了";
+"discogs_share_title" = "Discogsから登録（Discogsで検索したアルバムから登録）";
+"discogs_share_description" = "Discogsのレコードページで共有ボタンをタップし、RecoColle2を選ぶとコレクションに自動登録されます";
+"tips_section" = "Tips";
+"sns_longpress_title" = "SNS投稿ネタを収集";
+"sns_longpress_description" = "トップ画面のアルバム画像を長押しすると、SNSへの投稿用にレコード情報をシェアできます";
+"album_delete_title" = "アルバムの削除";
+"album_delete_description" = "追加したアルバムはトップ画面で横にスワイプして削除できます";

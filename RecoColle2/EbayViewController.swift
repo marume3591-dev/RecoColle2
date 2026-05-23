@@ -322,7 +322,7 @@ extension EbayViewController: UITableViewDelegate, UITableViewDataSource {
         webView.url = ebayUrl ?? ""
         print("wwwwww")
         print(webView.url as String)
-        
+        webView.modalPresentationStyle = .fullScreen
         self.present(webView, animated: true, completion: nil)
     }
 

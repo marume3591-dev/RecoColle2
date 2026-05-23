@@ -36,6 +36,8 @@ struct CollectionStatsView: View {
                 }
             }
             .padding()
+            .frame(maxWidth: UIDevice.current.userInterfaceIdiom == .pad ? 800 : .infinity)
+            .frame(maxWidth: .infinity)
         }
         .navigationTitle(NSLocalizedString("collection_stats_menu", comment: ""))
         .navigationBarTitleDisplayMode(.inline)

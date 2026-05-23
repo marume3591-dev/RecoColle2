@@ -666,10 +666,10 @@ PickerViewCell</string>
                         <constraints>
                             <constraint firstItem="eLG-EQ-YzK" firstAttribute="leading" secondItem="SLm-ng-uMd" secondAttribute="leading" constant="3" id="76U-xh-YsY"/>
                             <constraint firstItem="SLm-ng-uMd" firstAttribute="bottom" secondItem="eLG-EQ-YzK" secondAttribute="bottom" constant="3" id="AWV-CX-EVQ"/>
-                            <constraint firstItem="70C-Vu-Y1i" firstAttribute="top" secondItem="7Tx-zT-2L1" secondAttribute="top" constant="10" id="DbN-yi-mmI"/>
+                            <constraint firstItem="70C-Vu-Y1i" firstAttribute="top" secondItem="SLm-ng-uMd" secondAttribute="top" constant="10" id="DbN-yi-mmI"/>
                             <constraint firstItem="70C-Vu-Y1i" firstAttribute="leading" relation="greaterThanOrEqual" secondItem="vGW-gz-tep" secondAttribute="trailing" constant="8" symbolic="YES" id="IM4-aa-zeS"/>
-                            <constraint firstItem="eLG-EQ-YzK" firstAttribute="top" secondItem="SLm-ng-uMd" secondAttribute="top" constant="40" id="aTL-Yh-KJ8"/>
-                            <constraint firstItem="vGW-gz-tep" firstAttribute="top" secondItem="7Tx-zT-2L1" secondAttribute="top" constant="10" id="ctm-7g-bsl"/>
+                            <constraint firstItem="eLG-EQ-YzK" firstAttribute="top" secondItem="SLm-ng-uMd" secondAttribute="top" constant="55" id="aTL-Yh-KJ8"/>
+                            <constraint firstItem="vGW-gz-tep" firstAttribute="top" secondItem="SLm-ng-uMd" secondAttribute="top" constant="10" id="ctm-7g-bsl"/>
                             <constraint firstItem="70C-Vu-Y1i" firstAttribute="centerX" secondItem="7Tx-zT-2L1" secondAttribute="centerX" id="q03-iF-dIV"/>
                             <constraint firstAttribute="trailing" secondItem="eLG-EQ-YzK" secondAttribute="trailing" constant="3" id="umT-7A-Tay"/>
                             <constraint firstItem="vGW-gz-tep" firstAttribute="leading" secondItem="SLm-ng-uMd" secondAttribute="leading" constant="10" id="wTD-LF-iTg"/>

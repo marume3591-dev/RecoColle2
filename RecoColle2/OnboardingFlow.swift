@@ -132,6 +132,8 @@ struct WelcomeScreen: View {
                 .padding(.bottom, 8)
         }
         .padding(.horizontal, 24)
+        .frame(maxWidth: UIDevice.current.userInterfaceIdiom == .pad ? 600 : .infinity)
+        .frame(maxWidth: .infinity)
         .background(Color(UIColor.systemBackground))
     }
 }
@@ -746,6 +748,8 @@ struct ConfirmScreen: View {
                 .background(Color(UIColor.systemGroupedBackground))
         }
         .background(Color(UIColor.systemGroupedBackground))
+        .frame(maxWidth: UIDevice.current.userInterfaceIdiom == .pad ? 700 : .infinity)
+        .frame(maxWidth: .infinity)
     }
 }
 

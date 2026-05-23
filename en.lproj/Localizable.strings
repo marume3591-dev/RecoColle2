@@ -198,3 +198,10 @@
 "sns_discography" = "Discography";
 "align_frame_catno" = "Align the catalog number within the frame";
 "done_button" = "Done";
+"discogs_share_title" = "Add from Discogs (register from albums searched on Discogs)";
+"discogs_share_description" = "On a Discogs record page, tap the Share button and select RecoColle2 to automatically add it to your collection";
+"tips_section" = "Tips";
+"sns_longpress_title" = "Collect SNS Post Ideas";
+"sns_longpress_description" = "Long-press an album image on the home screen to share record info for your social media posts";
+"album_delete_title" = "Delete an Album";
+"album_delete_description" = "Swipe left on an album on the home screen to delete it";

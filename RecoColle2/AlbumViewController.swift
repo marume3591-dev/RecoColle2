@@ -110,6 +110,21 @@ class AlbumViewController: UIViewController {
 
         TableView.delegate = self
         TableView.dataSource = self
+        TableView.register(AlbumListCell.self, forCellReuseIdentifier: AlbumListCell.identifier)
+        TableView.rowHeight = UIDevice.current.userInterfaceIdiom == .pad ? 120 : 100
+        TableView.separatorStyle = .none
+
+        // Storyboardの固定幅制約を上書きしてiPadで全幅表示
+        TableView.translatesAutoresizingMaskIntoConstraints = false
+        TableView.constraints.forEach { TableView.removeConstraint($0) }
+        if let superview = TableView.superview {
+            NSLayoutConstraint.activate([
+                TableView.topAnchor.constraint(equalTo: superview.safeAreaLayoutGuide.topAnchor),
+                TableView.leadingAnchor.constraint(equalTo: superview.leadingAnchor),
+                TableView.trailingAnchor.constraint(equalTo: superview.trailingAnchor),
+                TableView.bottomAnchor.constraint(equalTo: BannerView.topAnchor),
+            ])
+        }
 
         let addBtn = UIBarButtonItem(
             barButtonSystemItem: .add,
@@ -159,12 +174,15 @@ class AlbumViewController: UIViewController {
             ImobileSdkAds.start(bySpotID: IMOBILE_BANNER_SID)
         }
 
-        let adSize = CGSize(width: 320, height: 50)
-        let screenSize = UIScreen.main.bounds.size
-        let x = (screenSize.width - adSize.width) / 2
-
-        let adView = UIView(frame: CGRect(x: x, y: 0, width: adSize.width, height: adSize.height))
+        let adView = UIView()
+        adView.translatesAutoresizingMaskIntoConstraints = false
         BannerView.addSubview(adView)
+        NSLayoutConstraint.activate([
+            adView.centerXAnchor.constraint(equalTo: BannerView.centerXAnchor),
+            adView.centerYAnchor.constraint(equalTo: BannerView.centerYAnchor),
+            adView.widthAnchor.constraint(equalToConstant: 320),
+            adView.heightAnchor.constraint(equalToConstant: 50),
+        ])
         ImobileSdkAds.showBySpotID(forAdMobMediation: IMOBILE_BANNER_SID, view: adView)
     }
 
@@ -243,20 +261,17 @@ extension AlbumViewController: UITableViewDelegate, UITableViewDataSource {
     }
 
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return 100
+        return UIDevice.current.userInterfaceIdiom == .pad ? 120 : 100
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = TableView.dequeueReusableCell(withIdentifier: "TableViewCell", for: indexPath)
+        let cell = TableView.dequeueReusableCell(withIdentifier: AlbumListCell.identifier, for: indexPath) as! AlbumListCell
         let album = albums[tbl_index[indexPath.section][indexPath.row]]
-        let title = cell.contentView.viewWithTag(1) as! UILabel
-        let labelCounts = cell.contentView.viewWithTag(3) as! UILabel
-        title.text = album.albumName
-        labelCounts.text = "(\(tbl_index[indexPath.section].count))"
+        cell.nameLabel.text = album.albumName
+        cell.countLabel.text = "(\(tbl_index[indexPath.section].count))"
 
         let request = NSFetchRequest<RecordList2>(entityName: "RecordList2")
-        let predicate = NSPredicate(format: "id == %@", album.idRecordList2!)
-        request.predicate = predicate
+        request.predicate = NSPredicate(format: "id == %@", album.idRecordList2!)
         let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
         do {
             recordLists = try context.fetch(request)
@@ -264,15 +279,11 @@ extension AlbumViewController: UITableViewDelegate, UITableViewDataSource {
             print("読み込み失敗！")
         }
 
-        let recordList = recordLists[0]
-        let albumImage = cell.contentView.viewWithTag(2) as! UIImageView
-        let imageData = recordList.albumImage
-        if imageData != nil {
-            albumImage.image = UIImage(data: imageData! as Data)
-            albumImage.contentMode = .scaleAspectFill
+        if let first = recordLists.first, let imageData = first.albumImage, let img = UIImage(data: imageData as Data) {
+            cell.albumImageView.image = img
         } else {
-            albumImage.image = UIImage(data: "".data(using: String.Encoding.utf8)! as Data)
-            albumImage.contentMode = .scaleAspectFill
+            cell.albumImageView.image = UIImage(systemName: "music.note.list")
+            cell.albumImageView.tintColor = .secondaryLabel
         }
 
         return cell
@@ -380,4 +391,59 @@ extension AlbumViewController: UITableViewDelegate, UITableViewDataSource {
             print("Rename failed:", error)
         }
     }
+}
+
+// MARK: - AlbumListCell
+
+class AlbumListCell: UITableViewCell {
+    static let identifier = "AlbumListCell"
+
+    let albumImageView: UIImageView = {
+        let iv = UIImageView()
+        iv.contentMode = .scaleAspectFill
+        iv.clipsToBounds = true
+        iv.layer.cornerRadius = 4
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        return iv
+    }()
+
+    let nameLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 16, weight: .medium)
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    let countLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 13)
+        l.textColor = .secondaryLabel
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        contentView.addSubview(albumImageView)
+        contentView.addSubview(nameLabel)
+        contentView.addSubview(countLabel)
+
+        let imgSize: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 96 : 80
+
+        NSLayoutConstraint.activate([
+            albumImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+            albumImageView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            albumImageView.widthAnchor.constraint(equalToConstant: imgSize),
+            albumImageView.heightAnchor.constraint(equalToConstant: imgSize),
+
+            nameLabel.leadingAnchor.constraint(equalTo: albumImageView.trailingAnchor, constant: 12),
+            nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+            nameLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 28),
+
+            countLabel.leadingAnchor.constraint(equalTo: albumImageView.trailingAnchor, constant: 12),
+            countLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 6),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
 }
