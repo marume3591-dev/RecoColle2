@@ -2,10 +2,9 @@
 //  CropViewController.swift
 //  RecoColle2
 //
-//  写真を正方形にクロップするViewController
-//  ・ScrollViewを画面全体に広げてピンチ・ドラッグを全面で受け取る
-//  ・正方形のオーバーレイは別レイヤーで表示（タッチを透過）
-//  ・確定ボタンでクロップ枠内の画像を切り抜いて返す
+//  ・写真は画面いっぱいに表示（固定）
+//  ・正方形の枠をドラッグで移動、コーナーをドラッグでリサイズ
+//  ・確定で枠内を切り抜いて返す
 
 import UIKit
 
@@ -21,75 +20,90 @@ class CropViewController: UIViewController {
     var sourceImage: UIImage!
 
     // MARK: - Private UI
-    private let scrollView   = UIScrollView()
     private let imageView    = UIImageView()
-    private let cropOverlay  = CropOverlayView()
+    private let cropBoxView  = CropBoxView()
     private let confirmButton = UIButton(type: .system)
     private let cancelButton  = UIButton(type: .system)
 
-    /// クロップ枠のサイズ（画面幅 - 余白）
-    private var cropSize: CGFloat {
-        return min(view.bounds.width, view.bounds.height) - 40
-    }
+    // クロップ枠のフレーム（view座標系）
+    private var cropFrame: CGRect = .zero
 
-    /// クロップ枠のRect（view座標系）
-    private var cropRect: CGRect {
-        let size = cropSize
-        return CGRect(
-            x: (view.bounds.width  - size) / 2,
-            y: (view.bounds.height - size) / 2,
-            width: size,
-            height: size
-        )
+    // ドラッグ開始時の状態
+    private var dragStartCropFrame: CGRect = .zero
+    private var dragStartPoint: CGPoint = .zero
+    private enum DragMode {
+        case none, move
+        case resizeTopLeft, resizeTopRight, resizeBottomLeft, resizeBottomRight
     }
+    private var dragMode: DragMode = .none
+
+    // コーナーのタッチ判定サイズ
+    private let cornerHitSize: CGFloat = 44
+
+    // 枠の最小サイズ
+    private let minBoxSize: CGFloat = 80
 
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
-        setupScrollView()
-        setupOverlay()
+        setupImageView()
+        setupCropBox()
         setupButtons()
+        setupGestures()
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        configureScrollView()
-        cropOverlay.frame    = view.bounds
-        cropOverlay.cropRect = cropRect
-        cropOverlay.setNeedsDisplay()
+        setupInitialLayout()
+    }
+
+    private var layoutDone = false
+    private func setupInitialLayout() {
+        guard !layoutDone else { return }
+        layoutDone = true
+
+        // 画像を画面いっぱいに表示（アスペクト比維持）
+        guard let img = sourceImage else { return }
+        let viewW = view.bounds.width
+        let viewH = view.bounds.height
+        let imgW  = img.size.width
+        let imgH  = img.size.height
+        let scale = min(viewW / imgW, viewH / imgH)
+        let dispW = imgW * scale
+        let dispH = imgH * scale
+        imageView.frame = CGRect(
+            x: (viewW - dispW) / 2,
+            y: (viewH - dispH) / 2,
+            width: dispW,
+            height: dispH
+        )
+
+        // 初期クロップ枠：画像表示範囲内で中央に正方形
+        let boxSize = min(dispW, dispH) * 0.8
+        cropFrame = CGRect(
+            x: (viewW - boxSize) / 2,
+            y: (viewH - boxSize) / 2,
+            width: boxSize,
+            height: boxSize
+        )
+        cropBoxView.frame = view.bounds
+        cropBoxView.cropRect = cropFrame
+        cropBoxView.setNeedsDisplay()
     }
 
     // MARK: - Setup
 
-    private func setupScrollView() {
-        // ScrollView は画面全体（ピンチ・ドラッグを全面で受け取る）
-        scrollView.delegate = self
-        scrollView.showsVerticalScrollIndicator   = false
-        scrollView.showsHorizontalScrollIndicator = false
-        scrollView.bouncesZoom  = true
-        scrollView.clipsToBounds = true
-        scrollView.backgroundColor = .black
-        view.addSubview(scrollView)
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-        ])
-
+    private func setupImageView() {
         imageView.contentMode = .scaleAspectFit
-        imageView.image = sourceImage
-        scrollView.addSubview(imageView)
+        imageView.image = sourceImage?.fixedOrientation()
+        view.addSubview(imageView)
     }
 
-    private func setupOverlay() {
-        // オーバーレイはScrollViewの上に重ねる（タッチは透過）
-        cropOverlay.isUserInteractionEnabled = false
-        cropOverlay.backgroundColor = .clear
-        view.addSubview(cropOverlay)
+    private func setupCropBox() {
+        cropBoxView.isUserInteractionEnabled = false
+        view.addSubview(cropBoxView)
     }
 
     private func setupButtons() {
@@ -115,41 +129,113 @@ class CropViewController: UIViewController {
         ])
     }
 
-    private func configureScrollView() {
-        guard let img = sourceImage else { return }
+    private func setupGestures() {
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+        view.addGestureRecognizer(pan)
+    }
 
-        let viewW = view.bounds.width
-        let viewH = view.bounds.height
-        let imgW  = img.size.width
-        let imgH  = img.size.height
+    // MARK: - Gesture
 
-        // 初期表示：画像の短辺をクロップ枠サイズに合わせる（枠が必ず画像内に収まる）
-        let initialScale = cropSize / min(imgW, imgH)
-        let scaledW = imgW * initialScale
-        let scaledH = imgH * initialScale
+    @objc private func handlePan(_ gr: UIPanGestureRecognizer) {
+        let point = gr.location(in: view)
 
-        imageView.frame = CGRect(x: 0, y: 0, width: scaledW, height: scaledH)
-        scrollView.contentSize = CGSize(width: scaledW, height: scaledH)
+        switch gr.state {
+        case .began:
+            dragStartPoint = point
+            dragStartCropFrame = cropFrame
+            dragMode = detectDragMode(at: point)
 
-        // ズーム範囲
-        scrollView.minimumZoomScale = 1.0
-        scrollView.maximumZoomScale = 5.0
-        scrollView.zoomScale        = 1.0
+        case .changed:
+            let dx = point.x - dragStartPoint.x
+            let dy = point.y - dragStartPoint.y
+            updateCropFrame(dx: dx, dy: dy)
 
-        // 画像を画面中央に表示
-        let insetX = max(0, (viewW - scaledW) / 2)
-        let insetY = max(0, (viewH - scaledH) / 2)
-        scrollView.contentInset = UIEdgeInsets(top: insetY, left: insetX, bottom: insetY, right: insetX)
-
-        // クロップ枠の中心に画像中心が来るようにオフセットを設定
-        let offsetX = (scaledW - viewW) / 2
-        let offsetY = (scaledH - viewH) / 2
-        if offsetX > 0 || offsetY > 0 {
-            scrollView.contentOffset = CGPoint(
-                x: max(0, offsetX),
-                y: max(0, offsetY)
-            )
+        default:
+            dragMode = .none
         }
+    }
+
+    private func detectDragMode(at point: CGPoint) -> DragMode {
+        let f = cropFrame
+        let hs = cornerHitSize
+
+        // コーナー判定（正方形なので4隅）
+        if CGRect(x: f.minX - hs/2, y: f.minY - hs/2, width: hs, height: hs).contains(point) {
+            return .resizeTopLeft
+        }
+        if CGRect(x: f.maxX - hs/2, y: f.minY - hs/2, width: hs, height: hs).contains(point) {
+            return .resizeTopRight
+        }
+        if CGRect(x: f.minX - hs/2, y: f.maxY - hs/2, width: hs, height: hs).contains(point) {
+            return .resizeBottomLeft
+        }
+        if CGRect(x: f.maxX - hs/2, y: f.maxY - hs/2, width: hs, height: hs).contains(point) {
+            return .resizeBottomRight
+        }
+        // 枠内ならMove
+        if f.contains(point) {
+            return .move
+        }
+        return .none
+    }
+
+    private func updateCropFrame(dx: CGFloat, dy: CGFloat) {
+        let img = imageView.frame  // 画像の表示範囲（移動・リサイズの限界）
+        var f = dragStartCropFrame
+
+        switch dragMode {
+        case .move:
+            f.origin.x += dx
+            f.origin.y += dy
+
+        case .resizeTopLeft:
+            // 左上コーナー：右下を固定して正方形を維持
+            let delta = (dx + dy) / 2  // 平均移動量で正方形維持
+            let newSize = max(minBoxSize, f.width - delta)
+            let sizeDiff = newSize - f.width
+            f.origin.x -= sizeDiff
+            f.origin.y -= sizeDiff
+            f.size = CGSize(width: newSize, height: newSize)
+
+        case .resizeTopRight:
+            // 右上コーナー：左下を固定
+            let delta = (-dx + dy) / 2
+            let newSize = max(minBoxSize, f.width - delta)
+            let sizeDiff = newSize - f.width
+            f.origin.y -= sizeDiff
+            f.size = CGSize(width: newSize, height: newSize)
+
+        case .resizeBottomLeft:
+            // 左下コーナー：右上を固定
+            let delta = (dx - dy) / 2
+            let newSize = max(minBoxSize, f.width - delta)
+            let sizeDiff = newSize - f.width
+            f.origin.x -= sizeDiff
+            f.size = CGSize(width: newSize, height: newSize)
+
+        case .resizeBottomRight:
+            // 右下コーナー：左上を固定
+            let delta = -(dx + dy) / 2
+            let newSize = max(minBoxSize, f.width - delta)
+            f.size = CGSize(width: newSize, height: newSize)
+
+        case .none:
+            return
+        }
+
+        // 画像範囲外に出ないよう制限
+        f.origin.x = max(img.minX, min(f.origin.x, img.maxX - f.width))
+        f.origin.y = max(img.minY, min(f.origin.y, img.maxY - f.height))
+        // 枠が画像からはみ出ないようサイズも制限
+        f.size.width  = min(f.width,  img.maxX - f.origin.x)
+        f.size.height = min(f.height, img.maxY - f.origin.y)
+        // 正方形を維持
+        let side = min(f.width, f.height)
+        f.size = CGSize(width: side, height: side)
+
+        cropFrame = f
+        cropBoxView.cropRect = f
+        cropBoxView.setNeedsDisplay()
     }
 
     // MARK: - Actions
@@ -165,67 +251,36 @@ class CropViewController: UIViewController {
     // MARK: - Crop
 
     private func cropImage() -> UIImage {
-        guard let img = sourceImage else { return UIImage() }
+        guard let img = sourceImage?.fixedOrientation() else { return UIImage() }
 
-        let imgW = img.size.width
-        let imgH = img.size.height
+        // imageView上での表示スケール（元画像→表示画像）
+        let scaleX = img.size.width  / imageView.frame.width
+        let scaleY = img.size.height / imageView.frame.height
 
-        // 現在の表示スケール（初期scale × zoomScale）
-        let initialScale = cropSize / min(imgW, imgH)
-        let totalScale   = initialScale * scrollView.zoomScale
-
-        // scrollView上でのクロップ枠の位置（view座標 → scrollView content座標）
-        let inset   = scrollView.contentInset
-        let offset  = scrollView.contentOffset
-
-        // クロップ枠のview座標系での左上
-        let cropOriginInView = CGPoint(x: cropRect.minX, y: cropRect.minY)
-
-        // scrollView content座標に変換
-        let contentX = offset.x + cropOriginInView.x - inset.left  // insetが負になることはないがmax(0,...)で保護
-        let contentY = offset.y + cropOriginInView.y - inset.top
+        // cropFrameをimageView座標系に変換
+        let relX = cropFrame.origin.x - imageView.frame.origin.x
+        let relY = cropFrame.origin.y - imageView.frame.origin.y
 
         // 元画像座標に変換
-        let imgX = contentX / totalScale
-        let imgY = contentY / totalScale
-        let imgCropW = cropSize / totalScale
-        let imgCropH = cropSize / totalScale
+        let srcX = relX * scaleX
+        let srcY = relY * scaleY
+        let srcW = cropFrame.width  * scaleX
+        let srcH = cropFrame.height * scaleY
 
-        let clampedX = min(max(0, imgX), imgW - imgCropW)
-        let clampedY = min(max(0, imgY), imgH - imgCropH)
-        let clampedW = min(imgCropW, imgW - clampedX)
-        let clampedH = min(imgCropH, imgH - clampedY)
+        let clampedX = max(0, min(srcX, img.size.width  - srcW))
+        let clampedY = max(0, min(srcY, img.size.height - srcH))
+        let clampedW = min(srcW, img.size.width  - clampedX)
+        let clampedH = min(srcH, img.size.height - clampedY)
 
         let rect = CGRect(x: clampedX, y: clampedY, width: clampedW, height: clampedH)
-
-        let fixed = img.fixedOrientation()
-        guard let cgImg = fixed.cgImage?.cropping(to: rect) else { return img }
+        guard let cgImg = img.cgImage?.cropping(to: rect) else { return img }
         return UIImage(cgImage: cgImg)
     }
 }
 
-// MARK: - UIScrollViewDelegate
+// MARK: - CropBoxView（暗幕＋正方形の穴＋コーナーハンドル）
 
-extension CropViewController: UIScrollViewDelegate {
-    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-        return imageView
-    }
-
-    func scrollViewDidZoom(_ scrollView: UIScrollView) {
-        // ズーム後も画像を中央寄せ
-        let viewW = view.bounds.width
-        let viewH = view.bounds.height
-        let contentW = scrollView.contentSize.width
-        let contentH = scrollView.contentSize.height
-        let insetX = max(0, (viewW - contentW) / 2)
-        let insetY = max(0, (viewH - contentH) / 2)
-        scrollView.contentInset = UIEdgeInsets(top: insetY, left: insetX, bottom: insetY, right: insetX)
-    }
-}
-
-// MARK: - CropOverlayView（暗幕＋正方形の穴＋グリッド線）
-
-class CropOverlayView: UIView {
+class CropBoxView: UIView {
 
     var cropRect: CGRect = .zero
 
@@ -234,7 +289,6 @@ class CropOverlayView: UIView {
         backgroundColor = .clear
         isOpaque = false
     }
-
     required init?(coder: NSCoder) { fatalError() }
 
     override func draw(_ rect: CGRect) {
@@ -260,23 +314,31 @@ class CropOverlayView: UIView {
         let third = cropRect.width / 3
         for i in 1...2 {
             let x = cropRect.minX + third * CGFloat(i)
-            ctx.move(to:    CGPoint(x: x, y: cropRect.minY))
+            ctx.move(to: CGPoint(x: x, y: cropRect.minY))
             ctx.addLine(to: CGPoint(x: x, y: cropRect.maxY))
             let y = cropRect.minY + third * CGFloat(i)
-            ctx.move(to:    CGPoint(x: cropRect.minX, y: y))
+            ctx.move(to: CGPoint(x: cropRect.minX, y: y))
             ctx.addLine(to: CGPoint(x: cropRect.maxX, y: y))
         }
         ctx.strokePath()
 
-        // コーナーマーカー
+        // コーナーハンドル（大きめで掴みやすく）
         ctx.setStrokeColor(UIColor.white.cgColor)
-        ctx.setLineWidth(3)
-        let L: CGFloat = 20
+        ctx.setLineWidth(4)
+        let L: CGFloat = 24
         let corners: [(CGPoint, CGPoint, CGPoint)] = [
-            (CGPoint(x: cropRect.minX,     y: cropRect.minY + L), CGPoint(x: cropRect.minX,     y: cropRect.minY),     CGPoint(x: cropRect.minX + L, y: cropRect.minY)),
-            (CGPoint(x: cropRect.maxX - L, y: cropRect.minY),     CGPoint(x: cropRect.maxX,     y: cropRect.minY),     CGPoint(x: cropRect.maxX,     y: cropRect.minY + L)),
-            (CGPoint(x: cropRect.minX,     y: cropRect.maxY - L), CGPoint(x: cropRect.minX,     y: cropRect.maxY),     CGPoint(x: cropRect.minX + L, y: cropRect.maxY)),
-            (CGPoint(x: cropRect.maxX - L, y: cropRect.maxY),     CGPoint(x: cropRect.maxX,     y: cropRect.maxY),     CGPoint(x: cropRect.maxX,     y: cropRect.maxY - L)),
+            (CGPoint(x: cropRect.minX, y: cropRect.minY + L),
+             CGPoint(x: cropRect.minX, y: cropRect.minY),
+             CGPoint(x: cropRect.minX + L, y: cropRect.minY)),
+            (CGPoint(x: cropRect.maxX - L, y: cropRect.minY),
+             CGPoint(x: cropRect.maxX, y: cropRect.minY),
+             CGPoint(x: cropRect.maxX, y: cropRect.minY + L)),
+            (CGPoint(x: cropRect.minX, y: cropRect.maxY - L),
+             CGPoint(x: cropRect.minX, y: cropRect.maxY),
+             CGPoint(x: cropRect.minX + L, y: cropRect.maxY)),
+            (CGPoint(x: cropRect.maxX - L, y: cropRect.maxY),
+             CGPoint(x: cropRect.maxX, y: cropRect.maxY),
+             CGPoint(x: cropRect.maxX, y: cropRect.maxY - L)),
         ]
         for (p1, p2, p3) in corners {
             ctx.move(to: p1); ctx.addLine(to: p2); ctx.addLine(to: p3)

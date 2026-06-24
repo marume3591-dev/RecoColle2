@@ -132,6 +132,7 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
         imagePickerController.sourceType = .photoLibrary
         imagePickerController.delegate = self
         imagePickerController.mediaTypes = ["public.image"]
+        imagePickerController.allowsEditing = false
         present(imagePickerController,animated: true,completion: nil)
     }
 
@@ -1324,8 +1325,9 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
         didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
     ) {
         picker.dismiss(animated: true)
-        guard let image = info[.originalImage] as? UIImage else { return }
-     
+        let image = (info[.editedImage] as? UIImage) ?? (info[.originalImage] as? UIImage)
+        guard let image = image else { return }
+        
         // OCR用途の場合はクロップせずそのまま処理
         if shouldRunOCR {
             let resizedForOCR = image.resize(targetSize: CGSize(width: 1024, height: 1024))
