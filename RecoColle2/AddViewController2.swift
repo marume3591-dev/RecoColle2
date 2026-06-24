@@ -1319,17 +1319,17 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
 
     func numberOfComponents(in pickerView: UIPickerView) -> Int { return 1 }
     
-    @objc func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+    @objc func imagePickerController(
+        _ picker: UIImagePickerController,
+        didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+    ) {
         picker.dismiss(animated: true)
         guard let image = info[.originalImage] as? UIImage else { return }
-        let resizedForOCR = image.resize(targetSize: CGSize(width: 1024, height: 1024))
-        self.ocrImage = resizedForOCR
-        if !shouldRunOCR {
-            let resized = image.resize(targetSize: CGSize(width: 400, height: 400))
-            self.albumImage.image = resized
-            self.resizedPicture = resized
-        }
+     
+        // OCR用途の場合はクロップせずそのまま処理
         if shouldRunOCR {
+            let resizedForOCR = image.resize(targetSize: CGSize(width: 1024, height: 1024))
+            self.ocrImage = resizedForOCR
             let service = SpineOCRService()
             service.recognize(from: resizedForOCR) { [weak self] hint in
                 guard let self = self else { return }
@@ -1347,9 +1347,17 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
                     self.ocrImage = nil
                 }
             }
+            return
         }
+     
+        // ジャケット画像用途 → クロップ画面を表示
+        let cropVC = CropViewController()
+        cropVC.sourceImage = image.fixedOrientation()
+        cropVC.delegate = self
+        cropVC.modalPresentationStyle = .fullScreen
+        present(cropVC, animated: true)
     }
-
+    
     @objc func selectImage() {
         let alert = UIAlertController(
             title: NSLocalizedString("cover_image_title", comment: ""),
@@ -2033,5 +2041,20 @@ extension AddViewController2: SHSessionDelegate {
                                    query: nil,
                                    totalPages: 1)
         }
+    }
+}
+extension AddViewController2: CropViewControllerDelegate {
+ 
+    func cropViewController(_ vc: CropViewController, didCrop image: UIImage) {
+        vc.dismiss(animated: true)
+        // 正方形にクロップ済みの画像を400×400にリサイズして保存
+        let resized = image.resize(targetSize: CGSize(width: 400, height: 400))
+        self.albumImage.image = resized
+        self.resizedPicture = resized
+    }
+ 
+    func cropViewControllerDidCancel(_ vc: CropViewController) {
+        vc.dismiss(animated: true)
+        // キャンセル時は何もしない（元の画像を維持）
     }
 }
