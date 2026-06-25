@@ -4,6 +4,38 @@
 import UIKit
 import CoreData
 
+// MARK: - Sort / Filter Models
+
+enum LibrarySortKey: String, CaseIterable {
+    case artistAsc   = "アーティスト名 (A→Z)"
+    case artistDesc  = "アーティスト名 (Z→A)"
+    case titleAsc    = "タイトル (A→Z)"
+    case titleDesc   = "タイトル (Z→A)"
+    case dateAsc     = "発売日 (古い順)"
+    case dateDesc    = "発売日 (新しい順)"
+    case formatAsc   = "フォーマット (A→Z)"
+    case labelAsc    = "レーベル (A→Z)"
+}
+
+enum LibraryWantsFilter: String, CaseIterable {
+    case collectionOnly = "コレクションのみ"
+    case wantsOnly      = "ウォントリストのみ"
+    case all            = "すべて"
+}
+
+struct LibraryFilter {
+    var format: String?
+    var country: String?
+    var label: String?
+    var wants: LibraryWantsFilter = .collectionOnly
+
+    var isActive: Bool {
+        format != nil || country != nil || label != nil || wants != .collectionOnly
+    }
+}
+
+// MARK: - LibraryViewController
+
 class LibraryViewController: UIViewController {
 
     private let context = (UIApplication.shared.delegate as! AppDelegate)
@@ -11,14 +43,21 @@ class LibraryViewController: UIViewController {
     private let fromAppDelegate = UIApplication.shared.delegate as! AppDelegate
 
     // MARK: - Properties
-    private var allRecords: [RecordList2] = []
+    private var allRecords: [RecordList2] = []      // CoreDataから取得した全件
+    private var displayRecords: [RecordList2] = []  // フィルタ・ソート後の表示用
+
     private var sortFlg = true
     private var albums: [Albums] = []
     private var uniqueValues2: [String] = []
     private var tbl_index: [[Int]] = [[]]
     private var wkAlbumName = ""
     private var isAdLoaded = false
-    private var librarySortFlg = true
+
+    // ソート・フィルタ状態
+    private var currentSort: LibrarySortKey = .artistAsc
+    private var currentFilter = LibraryFilter()
+
+    private var sortFilterButton: UIBarButtonItem!
 
     // MARK: - UI
 
@@ -60,7 +99,6 @@ class LibraryViewController: UIViewController {
 
     private var bannerHeightConstraint: NSLayoutConstraint!
 
-    // スクロールトップボタン
     private let scrollTopButton: UIButton = {
         let button = UIButton(type: .system)
         let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
@@ -160,8 +198,6 @@ class LibraryViewController: UIViewController {
         ])
     }
 
-    // MARK: - Layout Updates (rotation / iPad split view)
-
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         updateCollectionViewLayout()
@@ -192,6 +228,7 @@ class LibraryViewController: UIViewController {
 
     @objc private func scrollToTop() {
         if segmentedControl.selectedSegmentIndex == 0 {
+            guard !displayRecords.isEmpty else { return }
             collectionView.scrollToItem(at: IndexPath(item: 0, section: 0), at: .top, animated: true)
         } else {
             tableView.scrollToRow(at: IndexPath(row: 0, section: 0), at: .top, animated: true)
@@ -201,11 +238,8 @@ class LibraryViewController: UIViewController {
     private func updateScrollTopButtonVisibility(offsetY: CGFloat) {
         let shouldShow = offsetY > 200
         let currentlyVisible = scrollTopButton.alpha > 0.5
-        if shouldShow && !currentlyVisible {
-            scrollTopButton.alpha = 1
-        } else if !shouldShow && currentlyVisible {
-            scrollTopButton.alpha = 0
-        }
+        if shouldShow && !currentlyVisible { scrollTopButton.alpha = 1 }
+        else if !shouldShow && currentlyVisible { scrollTopButton.alpha = 0 }
     }
 
     // MARK: - NavigationBar
@@ -214,18 +248,39 @@ class LibraryViewController: UIViewController {
 
     private func updateNavBar() {
         let isAlbum = segmentedControl.selectedSegmentIndex == 1
-        let sortBtn = UIBarButtonItem(
-            image: UIImage(systemName: sortFlg ? "arrow.up" : "arrow.down"),
-            style: .plain, target: self, action: #selector(sortTapped(_:))
-        )
+
         if isAlbum {
+            // アルバムタブ：従来の昇順/降順ボタン＋追加ボタン
+            let sortBtn = UIBarButtonItem(
+                image: UIImage(systemName: sortFlg ? "arrow.up" : "arrow.down"),
+                style: .plain, target: self, action: #selector(albumSortTapped(_:))
+            )
             let addBtn = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(addAlbumTapped))
             navigationItem.rightBarButtonItem = addBtn
             navigationItem.leftBarButtonItem = sortBtn
         } else {
+            // ライブラリタブ：ソート＆フィルタボタン
+            sortFilterButton = UIBarButtonItem(
+                image: UIImage(systemName: "line.3.horizontal.decrease.circle"),
+                style: .plain,
+                target: self,
+                action: #selector(sortFilterTapped)
+            )
             navigationItem.rightBarButtonItem = nil
-            navigationItem.leftBarButtonItem = sortBtn
+            navigationItem.leftBarButtonItem = sortFilterButton
+            updateSortFilterIcon()
         }
+    }
+
+    /// フィルタ有効時はアイコンをfilled＋オレンジに
+    private func updateSortFilterIcon() {
+        guard segmentedControl.selectedSegmentIndex == 0 else { return }
+        let isFiltered = currentFilter.isActive
+        let iconName = isFiltered
+            ? "line.3.horizontal.decrease.circle.fill"
+            : "line.3.horizontal.decrease.circle"
+        sortFilterButton?.image = UIImage(systemName: iconName)
+        sortFilterButton?.tintColor = isFiltered ? .systemOrange : nil
     }
 
     // MARK: - Segment
@@ -242,7 +297,6 @@ class LibraryViewController: UIViewController {
             ? NSLocalizedString("library_title", comment: "")
             : NSLocalizedString("album_title", comment: "")
         updateNavBar()
-        // セグメント切替時はボタンを非表示
         scrollTopButton.alpha = 0
         loadData()
     }
@@ -258,16 +312,115 @@ class LibraryViewController: UIViewController {
     }
 
     private func loadLibraryData() {
+        // wantsFlgの絞り込みなしで全件取得し、フィルタ・ソートをSwiftで適用
         let request = NSFetchRequest<RecordList2>(entityName: "RecordList2")
-        let sort1 = NSSortDescriptor(key: "artistName", ascending: librarySortFlg)
-        let sort2 = NSSortDescriptor(key: "releaseDate", ascending: librarySortFlg)
-        request.sortDescriptors = [sort1, sort2]
-        request.predicate = NSPredicate(format: "wantsFlg == %@", "false")
+        request.sortDescriptors = [NSSortDescriptor(key: "artistName", ascending: true)]
         do {
             allRecords = try context.fetch(request)
-            collectionView.reloadData()
+            applyFilterAndSort()
         } catch { print("Library fetch failed:", error) }
     }
+
+    /// フィルタ → ソート を適用して displayRecords を更新
+    private func applyFilterAndSort() {
+        var result = allRecords
+
+        // --- wantsフィルタ ---
+        switch currentFilter.wants {
+        case .collectionOnly: result = result.filter { $0.wantsFlg == "false" }
+        case .wantsOnly:      result = result.filter { $0.wantsFlg == "true" }
+        case .all:            break
+        }
+
+        // --- フォーマットフィルタ ---
+        if let fmt = currentFilter.format {
+            result = result.filter { $0.format == fmt }
+        }
+
+        // --- 国フィルタ ---
+        if let country = currentFilter.country {
+            result = result.filter { $0.releaseCountry == country }
+        }
+
+        // --- レーベルフィルタ ---
+        if let lbl = currentFilter.label {
+            result = result.filter { $0.label == lbl }
+        }
+
+        // --- ソート ---
+        switch currentSort {
+        case .artistAsc:
+            result.sort { ($0.artistName ?? "").localizedCompare($1.artistName ?? "") == .orderedAscending }
+        case .artistDesc:
+            result.sort { ($0.artistName ?? "").localizedCompare($1.artistName ?? "") == .orderedDescending }
+        case .titleAsc:
+            result.sort { ($0.albumTitle ?? "").localizedCompare($1.albumTitle ?? "") == .orderedAscending }
+        case .titleDesc:
+            result.sort { ($0.albumTitle ?? "").localizedCompare($1.albumTitle ?? "") == .orderedDescending }
+        case .dateAsc:
+            result.sort { ($0.releaseDate ?? "") < ($1.releaseDate ?? "") }
+        case .dateDesc:
+            result.sort { ($0.releaseDate ?? "") > ($1.releaseDate ?? "") }
+        case .formatAsc:
+            result.sort { ($0.format ?? "").localizedCompare($1.format ?? "") == .orderedAscending }
+        case .labelAsc:
+            result.sort { ($0.label ?? "").localizedCompare($1.label ?? "") == .orderedAscending }
+        }
+
+        displayRecords = result
+        updateSortFilterIcon()
+        collectionView.reloadData()
+    }
+
+    // MARK: - フィルタ用ユニーク値
+
+    private func uniqueFormats() -> [String] {
+        Array(Set(allRecords.compactMap {
+            let v = $0.format; return (v?.isEmpty == false) ? v : nil
+        })).sorted()
+    }
+    private func uniqueCountries() -> [String] {
+        Array(Set(allRecords.compactMap {
+            let v = $0.releaseCountry; return (v?.isEmpty == false) ? v : nil
+        })).sorted()
+    }
+    private func uniqueLabels() -> [String] {
+        Array(Set(allRecords.compactMap {
+            let v = $0.label; return (v?.isEmpty == false) ? v : nil
+        })).sorted()
+    }
+
+    // MARK: - Sort / Filter Actions
+
+    @objc private func sortFilterTapped() {
+        let vc = LibrarySortFilterViewController(
+            currentSort: currentSort,
+            currentFilter: currentFilter,
+            formats: uniqueFormats(),
+            countries: uniqueCountries(),
+            labels: uniqueLabels()
+        )
+        vc.onApply = { [weak self] sort, filter in
+            guard let self else { return }
+            self.currentSort = sort
+            self.currentFilter = filter
+            self.applyFilterAndSort()
+        }
+        let nav = UINavigationController(rootViewController: vc)
+        if let sheet = nav.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+        }
+        present(nav, animated: true)
+    }
+
+    @objc private func albumSortTapped(_ sender: UIBarButtonItem) {
+        sortFlg.toggle()
+        sender.image = UIImage(systemName: sortFlg ? "arrow.up" : "arrow.down")
+        loadAlbumData()
+    }
+
+    // MARK: - Album Data
 
     private func loadAlbumData() {
         let request = NSFetchRequest<Albums>(entityName: "Albums")
@@ -328,18 +481,6 @@ class LibraryViewController: UIViewController {
             }
         })
         present(alert, animated: true)
-    }
-
-    @objc private func sortTapped(_ sender: UIBarButtonItem) {
-        if segmentedControl.selectedSegmentIndex == 1 {
-            sortFlg.toggle()
-            sender.image = UIImage(systemName: sortFlg ? "arrow.up" : "arrow.down")
-            loadAlbumData()
-        } else {
-            librarySortFlg.toggle()
-            sender.image = UIImage(systemName: librarySortFlg ? "arrow.up" : "arrow.down")
-            loadLibraryData()
-        }
     }
 
     // MARK: - Album CRUD
@@ -443,23 +584,25 @@ class LibraryViewController: UIViewController {
 extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataSource {
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        allRecords.count
+        displayRecords.count
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "LibraryCell", for: indexPath) as! LibraryCell
-        let record = allRecords[indexPath.item]
+        let record = displayRecords[indexPath.item]
         if let data = record.albumImage, let img = UIImage(data: data as Data) {
             cell.imageView.image = img
         } else {
             cell.imageView.image = UIImage(systemName: "music.note")
             cell.imageView.tintColor = .secondaryLabel
         }
+        // ウォントリストは半透明で区別
+        cell.contentView.alpha = record.wantsFlg == "true" ? 0.6 : 1.0
         return cell
     }
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        let record = allRecords[indexPath.item]
+        let record = displayRecords[indexPath.item]
         let storyboard = UIStoryboard(name: "Main", bundle: nil)
         let vc = storyboard.instantiateViewController(
             withIdentifier: "AddViewController2"
@@ -469,9 +612,7 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
         navigationController?.pushViewController(vc, animated: true)
     }
 
-    // コレクションビューのスクロール検知
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        // tableView のスクロールと区別
         if scrollView == collectionView || scrollView == tableView {
             updateScrollTopButtonVisibility(offsetY: scrollView.contentOffset.y)
         }
@@ -483,11 +624,10 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
 extension LibraryViewController: UITableViewDelegate, UITableViewDataSource {
 
     func numberOfSections(in tableView: UITableView) -> Int { uniqueValues2.count }
-
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { 1 }
 
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return UIDevice.current.userInterfaceIdiom == .pad ? 120 : 100
+        UIDevice.current.userInterfaceIdiom == .pad ? 120 : 100
     }
 
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat { .leastNormalMagnitude }
@@ -519,19 +659,13 @@ extension LibraryViewController: UITableViewDelegate, UITableViewDataSource {
     func tableView(_ tableView: UITableView,
                    trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath)
     -> UISwipeActionsConfiguration? {
-        let deleteAction = UIContextualAction(
-            style: .destructive,
-            title: NSLocalizedString("delete_action", comment: "")
-        ) { [weak self] _, _, done in
-            self?.deleteAlbum(indexPath: indexPath)
-            done(true)
+        let deleteAction = UIContextualAction(style: .destructive,
+            title: NSLocalizedString("delete_action", comment: "")) { [weak self] _, _, done in
+            self?.deleteAlbum(indexPath: indexPath); done(true)
         }
-        let renameAction = UIContextualAction(
-            style: .normal,
-            title: NSLocalizedString("rename_action", comment: "")
-        ) { [weak self] _, _, done in
-            self?.showRenameAlert(indexPath: indexPath)
-            done(true)
+        let renameAction = UIContextualAction(style: .normal,
+            title: NSLocalizedString("rename_action", comment: "")) { [weak self] _, _, done in
+            self?.showRenameAlert(indexPath: indexPath); done(true)
         }
         renameAction.backgroundColor = .systemBlue
         return UISwipeActionsConfiguration(actions: [deleteAction, renameAction])
@@ -574,14 +708,12 @@ class AlbumTableViewCell: UITableViewCell {
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
-
     private let nameLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 16, weight: .medium)
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
-
     private let countLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 13)
@@ -595,11 +727,12 @@ class AlbumTableViewCell: UITableViewCell {
         contentView.addSubview(thumbImageView)
         contentView.addSubview(nameLabel)
         contentView.addSubview(countLabel)
+        let imgSize: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 100 : 84
         NSLayoutConstraint.activate([
             thumbImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
             thumbImageView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            thumbImageView.widthAnchor.constraint(equalToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 100 : 84),
-            thumbImageView.heightAnchor.constraint(equalToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 100 : 84),
+            thumbImageView.widthAnchor.constraint(equalToConstant: imgSize),
+            thumbImageView.heightAnchor.constraint(equalToConstant: imgSize),
             nameLabel.leadingAnchor.constraint(equalTo: thumbImageView.trailingAnchor, constant: 12),
             nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
             nameLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 24),
@@ -622,6 +755,167 @@ class AlbumTableViewCell: UITableViewCell {
         } else {
             thumbImageView.image = UIImage(systemName: "music.note.list")
             thumbImageView.tintColor = .secondaryLabel
+        }
+    }
+}
+
+// MARK: - LibrarySortFilterViewController
+
+class LibrarySortFilterViewController: UIViewController {
+
+    var onApply: ((LibrarySortKey, LibraryFilter) -> Void)?
+
+    private var selectedSort: LibrarySortKey
+    private var selectedFilter: LibraryFilter
+
+    private let formats: [String]
+    private let countries: [String]
+    private let labels: [String]
+
+    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
+
+    private enum Section: Int, CaseIterable {
+        case sort, filterWants, filterFormat, filterCountry, filterLabel
+    }
+
+    init(currentSort: LibrarySortKey,
+         currentFilter: LibraryFilter,
+         formats: [String],
+         countries: [String],
+         labels: [String]) {
+        self.selectedSort   = currentSort
+        self.selectedFilter = currentFilter
+        self.formats        = formats
+        self.countries      = countries
+        self.labels         = labels
+        super.init(nibName: nil, bundle: nil)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "ソート / フィルタ"
+        view.backgroundColor = .systemGroupedBackground
+
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            title: "リセット", style: .plain, target: self, action: #selector(resetTapped)
+        )
+        navigationItem.leftBarButtonItem?.tintColor = .systemOrange
+
+        navigationItem.rightBarButtonItem = UIBarButtonItem(
+            title: "適用", style: .done, target: self, action: #selector(applyTapped)
+        )
+
+        tableView.translatesAutoresizingMaskIntoConstraints = false
+        tableView.delegate   = self
+        tableView.dataSource = self
+        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "Cell")
+        view.addSubview(tableView)
+        NSLayoutConstraint.activate([
+            tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+    }
+
+    @objc private func resetTapped() {
+        selectedSort   = .artistAsc
+        selectedFilter = LibraryFilter()
+        tableView.reloadData()
+    }
+
+    @objc private func applyTapped() {
+        onApply?(selectedSort, selectedFilter)
+        dismiss(animated: true)
+    }
+
+    private func filterItems(for section: Section) -> [String] {
+        switch section {
+        case .filterWants:   return LibraryWantsFilter.allCases.map { $0.rawValue }
+        case .filterFormat:  return ["すべて"] + formats
+        case .filterCountry: return ["すべて"] + countries
+        case .filterLabel:   return ["すべて"] + labels
+        default: return []
+        }
+    }
+}
+
+// MARK: - LibrarySortFilterViewController: UITableView
+
+extension LibrarySortFilterViewController: UITableViewDataSource, UITableViewDelegate {
+
+    func numberOfSections(in tableView: UITableView) -> Int { Section.allCases.count }
+
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        guard let sec = Section(rawValue: section) else { return 0 }
+        return sec == .sort ? LibrarySortKey.allCases.count : filterItems(for: sec).count
+    }
+
+    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        switch Section(rawValue: section) {
+        case .sort:          return "並び順"
+        case .filterWants:   return "表示対象"
+        case .filterFormat:  return "フォーマット"
+        case .filterCountry: return "リリース国"
+        case .filterLabel:   return "レーベル"
+        default: return nil
+        }
+    }
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = UITableViewCell(style: .default, reuseIdentifier: "Cell")
+        cell.tintColor = UIColor.systemBlue
+        guard let sec = Section(rawValue: indexPath.section) else { return cell }
+
+        if sec == .sort {
+            let key = LibrarySortKey.allCases[indexPath.row]
+            cell.textLabel?.text = key.rawValue
+            cell.accessoryType   = (selectedSort == key) ? UITableViewCell.AccessoryType.checkmark : .none
+        } else {
+            let list = filterItems(for: sec)
+            let text = list[indexPath.row]
+            cell.textLabel?.text = text
+
+            var isSelected = false
+            switch sec {
+            case .filterWants:
+                isSelected = text == selectedFilter.wants.rawValue
+            case .filterFormat:
+                isSelected = (text == "すべて" && selectedFilter.format == nil) || text == selectedFilter.format
+            case .filterCountry:
+                isSelected = (text == "すべて" && selectedFilter.country == nil) || text == selectedFilter.country
+            case .filterLabel:
+                isSelected = (text == "すべて" && selectedFilter.label == nil) || text == selectedFilter.label
+            default: break
+            }
+            cell.accessoryType = isSelected ? UITableViewCell.AccessoryType.checkmark : .none
+        }
+        return cell
+    }
+
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        guard let sec = Section(rawValue: indexPath.section) else { return }
+
+        if sec == .sort {
+            selectedSort = LibrarySortKey.allCases[indexPath.row]
+            tableView.reloadSections([indexPath.section], with: .none)
+        } else {
+            let list     = filterItems(for: sec)
+            let selected = list[indexPath.row]
+            switch sec {
+            case .filterWants:
+                selectedFilter.wants = LibraryWantsFilter.allCases.first { $0.rawValue == selected } ?? .collectionOnly
+            case .filterFormat:
+                selectedFilter.format  = (selected == "すべて") ? nil : selected
+            case .filterCountry:
+                selectedFilter.country = (selected == "すべて") ? nil : selected
+            case .filterLabel:
+                selectedFilter.label   = (selected == "すべて") ? nil : selected
+            default: break
+            }
+            tableView.reloadSections([indexPath.section], with: .none)
         }
     }
 }
