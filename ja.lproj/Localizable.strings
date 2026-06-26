@@ -206,3 +206,4 @@
 "album_delete_title" = "アルバムの削除";
 "album_delete_description" = "追加したアルバムはトップ画面で横にスワイプして削除できます";
 "crop_confirm_button" = "確定";
+"barcode_results" = "バーコード検索結果";

@@ -206,3 +206,4 @@
 "album_delete_title" = "Delete an Album";
 "album_delete_description" = "Swipe left on an album on the home screen to delete it";
 "crop_confirm_button" = "Done";
+"barcode_results" = "Barcode Search Results";

@@ -407,94 +407,22 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
             do {
                 if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let results = json["results"] as? [[String: Any]],
-                   let first = results.first {
+                   !results.isEmpty {
 
-                    let coverURL = first["cover_image"] as? String ?? ""
-                    let formats = (first["format"] as? [String])?.joined(separator: ", ") ?? ""
-                    let country = first["country"] as? String ?? ""
-
-                    let title = first["title"] as? String ?? ""
-                    let separators: [Character] = ["–", "-"]
-                    let parts = title.split(whereSeparator: { separators.contains($0) })
-                        .map { $0.trimmingCharacters(in: .whitespaces) }
-                    let artistName = parts.count > 0 ? parts[0] : ""
-                    let albumTitle = parts.count > 1 ? parts[1] : parts[0]
-
-                    guard let releaseID = first["id"] as? Int else {
-                        DispatchQueue.main.async { self.showAlert(NSLocalizedString("no_info_found", comment: "")) }
-                        return
+                    DispatchQueue.main.async {
+                        if results.count == 1 {
+                            // 1件のみの場合はそのまま反映
+                            self.applyDiscogsResult(results[0])
+                        } else {
+                            // 複数件の場合は選択画面へ
+                            self.showOCRResultList(
+                                results,
+                                title: NSLocalizedString("barcode_results", comment: ""),
+                                query: nil,
+                                totalPages: 1
+                            )
+                        }
                     }
-
-                    let detailURL = URL(string: "https://api.discogs.com/releases/\(releaseID)?key=\(key)&secret=\(secret)")!
-                    var detailRequest = URLRequest(url: detailURL)
-                    detailRequest.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-
-                    URLSession.shared.dataTask(with: detailRequest) { data, _, error in
-                        guard let data = data, error == nil else { return }
-
-                        var releaseYearString = ""
-                        var catnoString = ""
-                        var labelString = ""
-
-                        if let releaseJSON = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                            if let releasedYear = releaseJSON["year"] as? Int {
-                                releaseYearString = "\(releasedYear)"
-                            } else if let releasedString = releaseJSON["released"] as? String, !releasedString.isEmpty {
-                                releaseYearString = String(releasedString.prefix(4))
-                            }
-
-                            if let labels = releaseJSON["labels"] as? [[String: Any]],
-                               let firstLabel = labels.first {
-                                if let catno = firstLabel["catno"] as? String, !catno.isEmpty {
-                                    catnoString = catno
-                                }
-                                if let name = firstLabel["name"] as? String, !name.isEmpty {
-                                    labelString = name
-                                }
-                            }
-                        }
-
-                        DispatchQueue.main.async {
-                            self.textField.text = artistName
-                            self.textField2.text = albumTitle
-                            self.textField3.text = country
-                            self.textField4.text = releaseYearString
-                            self.formatTextField.text = formats
-                            self.pendingCatno = catnoString.isEmpty ? nil : catnoString
-                            self.pendingLabel = labelString.isEmpty ? nil : labelString
-
-                            if let catnoTextField = self.view.viewWithTag(4001) as? UITextField {
-                                catnoTextField.text = self.pendingCatno
-                            }
-                            if let labelTextField = self.view.viewWithTag(4002) as? UITextField {
-                                labelTextField.text = self.pendingLabel
-                            }
-
-                            self.pendingDiscogsReleaseId = String(releaseID)
-                            self.didLinkDiscogs = true
-
-                            Task {
-                                let stats = try? await DiscogsService().fetchPriceStats(releaseId: String(releaseID))
-                                await MainActor.run {
-                                    self.pendingPriceLow = stats?.lowest ?? 0
-                                    self.pendingPriceUpdatedAt = stats?.lowest != nil ? Date() : nil
-                                }
-                            }
-
-                            if let url = URL(string: coverURL) {
-                                URLSession.shared.dataTask(with: url) { data, _, _ in
-                                    if let data = data, let image = UIImage(data: data) {
-                                        DispatchQueue.main.async {
-                                            let resized = image.resize(targetSize: CGSize(width: 400, height: 400))
-                                            self.albumImage.image = resized
-                                            self.resizedPicture = resized
-                                        }
-                                    }
-                                }.resume()
-                            }
-                        }
-                    }.resume()
-
                 } else {
                     DispatchQueue.main.async { self.showAlert(NSLocalizedString("no_info_found", comment: "")) }
                 }
@@ -504,7 +432,7 @@ class AddViewController2: UIViewController, UITextFieldDelegate,  UIImagePickerC
             }
         }.resume()
     }
-
+    
     func fetchDiscogsInfoByOCR(artist: String?, title: String?, retryCount: Int = 0) {
         guard let artist = artist, let title = title else {
             showAlert(NSLocalizedString("ocr_incomplete", comment: ""))
